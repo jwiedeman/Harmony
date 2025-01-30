@@ -104,7 +104,7 @@ def apply_test_cases(adobe_call, test_cases):
 
             if condition == "exists":
                 if found:
-                    results.append(param_check["on_pass"].format(value=found_value, url=adobe_call["url"]))
+                    results.append((param_check["on_pass"].format(value=found_value, url=adobe_call["url"]), param_check["name"]))
                     # Check for dependent tests
                     dependent_tests = test.get("dependent_tests", "")
                     if dependent_tests:
@@ -115,7 +115,7 @@ def apply_test_cases(adobe_call, test_cases):
                                 dep_results = apply_test_cases(adobe_call, [dep_test])
                                 results.extend(dep_results)
                 else:
-                    results.append(param_check["on_fail"].format(url=adobe_call["url"]))
+                    results.append((param_check["on_fail"].format(url=adobe_call["url"]), param_check["name"]))
 
     return results
 
@@ -179,10 +179,10 @@ def main():
     sheet.title = "Test Results"
     sheet.append(['URL', 'Parameter', 'Result', 'Details'])
     for call in adobe_calls:
-        for result in call.get("results", []):
+        for result, param_name in call.get("results", []):
             sheet.append([
                 call['url'],
-                result.split("' ")[1].split("'")[0].strip(),
+                param_name,
                 result.split(':')[0].strip(),
                 result
             ])
