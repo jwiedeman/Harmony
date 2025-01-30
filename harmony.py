@@ -1,6 +1,6 @@
 import json
 import os
-import importlib.util
+import csv
 from urllib.parse import urlparse, parse_qs
 from collections import OrderedDict
 from colorama import Fore, Style, init
@@ -25,17 +25,26 @@ def load_har_file(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-def load_tests():
-    """Dynamically load test cases from the /tests/ directory."""
+def load_tests_from_csv(csv_path):
+    """Load test cases from a CSV file."""
     test_cases = []
-    tests_folder = './tests'
-    for filename in os.listdir(tests_folder):
-        if filename.endswith(".py"):
-            path = os.path.join(tests_folder, filename)
-            spec = importlib.util.spec_from_file_location(filename[:-3], path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            test_cases.append(module.test_case)
+    with open(csv_path, newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            test_case = {
+                "name": row["Test Name"],
+                "description": row["Description"],
+                "target_urls": row["Target URLs"].split(','),
+                "parameter_checks": [{
+                    "name": row["Parameter Name"],
+                    "condition": row["Condition"],
+                    "value": row["Expected Value"],
+                    "optional": row["Optional"].lower() == 'true',
+                    "on_pass": row["On Pass Message"],
+                    "on_fail": row["On Fail Message"]
+                }]
+            }
+            test_cases.append(test_case)
     return test_cases
 
 def extract_parameters(url, post_data_params):
@@ -91,9 +100,18 @@ def apply_test_cases(adobe_call, test_cases):
 
             if condition == "exists":
                 if found:
-                    results.append(Fore.GREEN + param_check["on_pass"].format(value=found_value, url=adobe_call["url"]) + Style.RESET_ALL)
+                    results.append(param_check["on_pass"].format(value=found_value, url=adobe_call["url"]))
+                    # Check for dependent tests
+                    dependent_tests = test.get("dependent_tests", "")
+                    if dependent_tests:
+                        dependent_test_names = dependent_tests.split(',')
+                        for dep_test_name in dependent_test_names:
+                            dep_test = next((t for t in test_cases if t["name"] == dep_test_name.strip()), None)
+                            if dep_test:
+                                dep_results = apply_test_cases(adobe_call, [dep_test])
+                                results.extend(dep_results)
                 else:
-                    results.append(Fore.RED + param_check["on_fail"] + Style.RESET_ALL)
+                    results.append(param_check["on_fail"].format(url=adobe_call["url"]))
 
     return results
 
@@ -112,8 +130,7 @@ def parse_har_for_adobe_calls(har_data, test_cases):
         }
         
         results = apply_test_cases(adobe_call, test_cases)
-        if results:
-            adobe_call["results"] = results
+        adobe_call["results"] = results
         adobe_calls.append(adobe_call)
     return adobe_calls
 
@@ -136,7 +153,7 @@ def main():
     har_file_path = find_har_file()
     if har_file_path:
         har_data = load_har_file(har_file_path)
-        test_cases = load_tests()
+        test_cases = load_tests_from_csv('test_cases.csv')
         adobe_calls = parse_har_for_adobe_calls(har_data, test_cases)
 
         for call in adobe_calls:
