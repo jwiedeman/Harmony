@@ -1,7 +1,9 @@
 import json
 import os
-import csv
+from openpyxl import Workbook
 from urllib.parse import urlparse, parse_qs
+import csv
+
 from collections import OrderedDict
 from colorama import Fore, Style, init
 
@@ -169,20 +171,21 @@ def main():
 
     for result in call["results"]:
         print(result)
-    # Write results to CSV
-    with open('harmony_test_results.csv', 'w', newline='') as csvfile:
-        fieldnames = ['url', 'parameter', 'result', 'details']
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
-        for call in adobe_calls:
-            for result in call.get("results", []):
-                writer.writerow({
-                    'url': call['url'],
-                    'parameter': result.split(':')[1].strip(),
-                    'result': result.split(':')[0].strip(),
-                    'details': result
-                })
-            print("\n" + "-" * 50 + "\n")
+    # Write results to XLSX
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Test Results"
+    sheet.append(['URL', 'Parameter', 'Result', 'Details'])
+    for call in adobe_calls:
+        for result in call.get("results", []):
+            sheet.append([
+                call['url'],
+                result.split(':')[1].strip(),
+                result.split(':')[0].strip(),
+                result
+            ])
+    workbook.save('harmony_test_results.xlsx')
+    print("\n" + "-" * 50 + "\n")
 
 
 if __name__ == "__main__":
