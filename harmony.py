@@ -5,7 +5,7 @@ from helper_functions import (
     find_har_file,
     load_har_file,
     load_tests_from_xlsx,
-    parse_har_for_adobe_calls,
+    parse_har_for_calls,
     combine_nested_keys,
 )
 from colorama import init
@@ -31,6 +31,11 @@ def write_results_to_excel(url_failures, dimension_failures, output_file='harmon
     workbook = openpyxl.load_workbook('template.xlsx')
     sheet = workbook.active
     
+    # Clear existing data in the Test Results sheet
+    for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, max_col=sheet.max_column):
+        for cell in row:
+            cell.value = None
+
     # Write URL Failures
     sheet['D1'], sheet['E1'] = 'URL Failures', 'Count'
     for row_num, (url, count) in enumerate(url_failures.items(), start=2):
@@ -44,7 +49,7 @@ def write_results_to_excel(url_failures, dimension_failures, output_file='harmon
         sheet.cell(row=row_num, column=8, value=count)
     
     workbook.save(output_file)
-    print(f"Results saved to {output_file}")
+    # print(f"Results saved to {output_file}")
 
 def main():
     """Main execution function to process HAR file and test cases."""
@@ -62,16 +67,16 @@ def main():
     write_results_to_excel(url_failures, dimension_failures)
     
     # Print results to console
-    for call in adobe_calls:
-        print(f"\nURL: {call['url']}")
-        print("Parameters:")
-        print(json.dumps(combine_nested_keys(call['parameters']), indent=2))
-        print("\nPayload:")
-        print("No payload" if call['payload'] == "No payload" else json.dumps(call['payload'], indent=2))
-        print("\nResults:")
-        for result in call.get("results", []):
-            print(result)
-        print("-" * 50)
+    # for call in adobe_calls:
+    # print(f"\nURL: {call['url']}")
+    # print("Parameters:")
+    # print(json.dumps(combine_nested_keys(call['parameters']), indent=2))
+    # print("\nPayload:")
+    # print("No payload" if call['payload'] == "No payload" else json.dumps(call['payload'], indent=2))
+    # print("\nResults:")
+    # for result in call.get("results", []):
+    #     print(result)
+    # print("-" * 50)
 
 if __name__ == "__main__":
     main()
