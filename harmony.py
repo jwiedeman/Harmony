@@ -13,12 +13,12 @@ from colorama import init
 # Initialize colorama
 init(autoreset=True)
 
-def analyze_failures(adobe_calls):
-    """Analyze and count failures based on Adobe call results."""
+def analyze_failures(calls):
+    """Analyze and count failures based on call results."""
     url_failures = {}
     dimension_failures = {}
     
-    for call in adobe_calls:
+    for call in calls:
         for result, param_name in call.get("results", []):
             if "Fail" in result:
                 url_failures[call['url']] = url_failures.get(call['url'], 0) + 1
@@ -56,7 +56,7 @@ def main():
     har_data = load_har_file(har_file_path)
     test_cases = load_tests_from_xlsx('test_cases.xlsx')
     
-    adobe_calls = parse_har_for_adobe_calls(har_data, test_cases)
+    adobe_calls = parse_har_for_calls(har_data, test_cases)
     url_failures, dimension_failures = analyze_failures(adobe_calls)
     
     write_results_to_excel(url_failures, dimension_failures)

@@ -49,9 +49,9 @@ def extract_parameters(url, post_data_params):
     return combined_params
 
 
-def apply_test_cases(adobe_call, test_cases):
+def apply_test_cases(call, test_cases):
     results = []
-    parsed_url = urlparse(adobe_call["url"])
+    parsed_url = urlparse(call["url"])
     call_domain = parsed_url.netloc
 
     for test in test_cases:
@@ -64,7 +64,7 @@ def apply_test_cases(adobe_call, test_cases):
             cond_name = condition["name"]
             cond_values = condition.get("value", [])
             is_optional = condition.get("optional", False)
-            param_value = adobe_call["parameters"].get(cond_name)
+            param_value = call["parameters"].get(cond_name)
             if param_value:
                 if cond_values and param_value not in cond_values:
                     conditions_met = False
@@ -86,46 +86,46 @@ def apply_test_cases(adobe_call, test_cases):
             found = False
             found_value = None
             for name in param_names:
-                if name in adobe_call["parameters"]:
+                if name in call["parameters"]:
                     found = True
-                    found_value = adobe_call["parameters"][name]
+                    found_value = call["parameters"][name]
                     break
 
             if condition == "exists":
                 if found:
-                    results.append((param_check["on_pass"].format(value=found_value, url=adobe_call["url"]), param_check["name"]))
+                    results.append((param_check["on_pass"].format(value=found_value, url=call["url"]), param_check["name"]))
                     dependent_tests = test.get("dependent_tests", "")
                     if dependent_tests:
                         dependent_test_names = dependent_tests.split(',')
                         for dep_test_name in dependent_test_names:
                             dep_test = next((t for t in test_cases if t["name"] == dep_test_name.strip()), None)
                             if dep_test:
-                                dep_results = apply_test_cases(adobe_call, [dep_test])
+                                dep_results = apply_test_cases(call, [dep_test])
                                 results.extend(dep_results)
                 else:
-                    results.append((param_check["on_fail"].format(url=adobe_call["url"]), param_check["name"]))
+                    results.append((param_check["on_fail"].format(url=call["url"]), param_check["name"]))
 
     return results
 
 
-def parse_har_for_adobe_calls(har_data, test_cases):
-    adobe_calls = []
+def parse_har_for_calls(har_data, test_cases):
+    calls = []
     for entry in har_data['log']['entries']:
         url = entry['request']['url']
         post_data = entry['request'].get('postData', {})
         post_data_params = {param["name"]: param["value"] for param in post_data.get('params', [])}
         parameters = extract_parameters(url, post_data_params)
 
-        adobe_call = {
+        call = {
             "url": url,
             "parameters": parameters,
             "payload": post_data.get("text", "No payload")
         }
 
-        results = apply_test_cases(adobe_call, test_cases)
-        adobe_call["results"] = results
-        adobe_calls.append(adobe_call)
-    return adobe_calls
+        results = apply_test_cases(call, test_cases)
+        call["results"] = results
+        calls.append(call)
+    return calls
 
 
 def combine_nested_keys(params):
