@@ -43,12 +43,7 @@ Harmony is a tool designed to analyze HAR (HTTP Archive) files and apply test ca
 4. **View Results**
    - Results will be saved in `harmony_test_results.xlsx`, formatted according to the template.
 
-## How to Use Harmony
 
-- **Test Cases**: Define your test cases in `test_cases.xlsx` using the format described above.
-- **HAR Files**: Place your HAR files in the project root directory.
-- **Run Harmony**: Execute the script to process the HAR files and apply the test cases.
-- **Results**: Check the `harmony_test_results.xlsx` file for the results of the test cases.
 
 ## Excel File Formats
 
@@ -90,7 +85,7 @@ Harmony is a tool designed to analyze HAR (HTTP Archive) files and apply test ca
 
 ## Cheat Sheet
 
-Refer to the [Cheat Sheet](README_CheatSheet.md) for detailed information on creating test cases.
+Refer to the section on creating test cases for detailed information.
 
 ## Contributing
 
@@ -98,4 +93,4 @@ Contributions are welcome! Please open an issue or submit a pull request for any
 
 ## License
 
-This project is licensed under the MIT License.
+This project is proprietary and all rights are reserved. Unauthorized use, distribution, or modification is prohibited. Please contact the project owner for licensing inquiries or permissions.
