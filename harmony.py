@@ -1,194 +1,77 @@
 import json
-import os
-from openpyxl import Workbook
 import openpyxl
-
-from urllib.parse import urlparse, parse_qs
-import csv
-
 from collections import OrderedDict
-from colorama import Fore, Style, init
+from helper_functions import (
+    find_har_file,
+    load_har_file,
+    load_tests_from_xlsx,
+    parse_har_for_adobe_calls,
+    combine_nested_keys,
+)
+from colorama import init
 
 # Initialize colorama
 init(autoreset=True)
 
-# Define target URL patterns to look for
-TARGET_URLS = ["metrics", "smetrics", "hb", "a.fox.com", "b.fox.com"]
-
-def find_har_file():
-    """Look for any HAR file in the current directory."""
-    for file in os.listdir('.'):
-        if file.endswith('.har'):
-            print(f"Found HAR file: {file}")
-            return file
-    print("No HAR file found in the current directory.")
-    return None
-
-def load_har_file(file_path):
-    """Load HAR file and return parsed JSON data."""
-    with open(file_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
-
-def load_tests_from_xlsx(xlsx_path):
-    """Load test cases from an XLSX file."""
-    test_cases = []
-    workbook = openpyxl.load_workbook(xlsx_path)
-    sheet = workbook.active
-    for row in sheet.iter_rows(min_row=2, values_only=True):
-        test_case = {
-            "name": row[0],
-            "description": row[1],
-            "target_urls": row[2].split(','),
-            "parameter_checks": [{
-                "name": row[3],
-                "condition": row[4],
-                "value": row[5],
-                "optional": str(row[6]).lower() == 'true',
-                "on_pass": row[7],
-                "on_fail": row[8]
-            }]
-        }
-        test_cases.append(test_case)
-    return test_cases
-
-def extract_parameters(url, post_data_params):
-    """Extract parameters from both URL query and post data."""
-    parsed_url = urlparse(url)
-    url_params = parse_qs(parsed_url.query)
-    url_params = {key: value[0] for key, value in url_params.items()}
-    combined_params = {**url_params, **post_data_params}
-    return combined_params
-
-def apply_test_cases(adobe_call, test_cases):
-    """Apply each test case to the adobe_call and log any flagged actions."""
-    results = []
-    parsed_url = urlparse(adobe_call["url"])
-    call_domain = parsed_url.netloc
-
-    for test in test_cases:
-        target_urls = test.get("target_urls", [])
-        if target_urls and not any(target in call_domain for target in target_urls):
-            continue
-
-        conditions_met = True
-        for condition in test.get("conditions", []):
-            cond_name = condition["name"]
-            cond_values = condition.get("value", [])
-            is_optional = condition.get("optional", False)
-            param_value = adobe_call["parameters"].get(cond_name)
-            if param_value:
-                if cond_values and param_value not in cond_values:
-                    conditions_met = False
-                    break
-            elif not is_optional:
-                conditions_met = False
-                break
-
-        if not conditions_met:
-            continue
-
-        for action in test.get("actions", []):
-            if action["type"] == "flag":
-                results.append(f"Flag: {action['message']}")
-
-        for param_check in test.get("parameter_checks", []):
-            param_names = param_check.get("names", [param_check.get("name")])
-            condition = param_check.get("condition", "")
-            found = False
-            found_value = None
-            for name in param_names:
-                if name in adobe_call["parameters"]:
-                    found = True
-                    found_value = adobe_call["parameters"][name]
-                    break
-
-            if condition == "exists":
-                if found:
-                    results.append((param_check["on_pass"].format(value=found_value, url=adobe_call["url"]), param_check["name"]))
-                    # Check for dependent tests
-                    dependent_tests = test.get("dependent_tests", "")
-                    if dependent_tests:
-                        dependent_test_names = dependent_tests.split(',')
-                        for dep_test_name in dependent_test_names:
-                            dep_test = next((t for t in test_cases if t["name"] == dep_test_name.strip()), None)
-                            if dep_test:
-                                dep_results = apply_test_cases(adobe_call, [dep_test])
-                                results.extend(dep_results)
-                else:
-                    results.append((param_check["on_fail"].format(url=adobe_call["url"]), param_check["name"]))
-
-    return results
-
-def parse_har_for_adobe_calls(har_data, test_cases):
-    adobe_calls = []
-    for entry in har_data['log']['entries']:
-        url = entry['request']['url']
-        post_data = entry['request'].get('postData', {})
-        post_data_params = {param["name"]: param["value"] for param in post_data.get('params', [])}
-        parameters = extract_parameters(url, post_data_params)
-        
-        adobe_call = {
-            "url": url,
-            "parameters": parameters,
-            "payload": post_data.get("text", "No payload")
-        }
-        
-        results = apply_test_cases(adobe_call, test_cases)
-        adobe_call["results"] = results
-        adobe_calls.append(adobe_call)
-    return adobe_calls
-
-def combine_nested_keys(params):
-    """Combine parameters with cascading keys like 'c.', '.c', 'a.', etc."""
-    combined_params = OrderedDict()
-    current_key = ""
-
-    for key, value in params.items():
-        if key.endswith('.') or key.startswith('.'):
-            current_key += key.strip('.')
-        else:
-            full_key = f"{current_key}.{key}" if current_key else key
-            combined_params[full_key] = value
-            current_key = ""
-
-    return combined_params
-
-def main():
-    har_file_path = find_har_file()
-    if har_file_path:
-        har_data = load_har_file(har_file_path)
-        test_cases = load_tests_from_xlsx('test_cases.xlsx')
-        adobe_calls = parse_har_for_adobe_calls(har_data, test_cases)
-
-        for call in adobe_calls:
-            if "results" in call:
-                print(f"URL: {call['url']}")
-                combined_params = combine_nested_keys(call['parameters'])
-                print("\nParameters:")
-                print(json.dumps(combined_params, indent=2))
-                print("\nPayload:")
-                print("No payload" if call['payload'] == "No payload" else json.dumps(call['payload'], indent=2))
-                print("\nResults:")
-                import csv
-
-    for result in call["results"]:
-        print(result)
-    # Write results to XLSX
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Test Results"
-    sheet.append(['URL', 'Parameter', 'Result', 'Details'])
+def analyze_failures(adobe_calls):
+    """Analyze and count failures based on Adobe call results."""
+    url_failures = {}
+    dimension_failures = {}
+    
     for call in adobe_calls:
         for result, param_name in call.get("results", []):
-            sheet.append([
-                call['url'],
-                param_name,
-                result.split(':')[0].strip(),
-                result
-            ])
-    workbook.save('harmony_test_results.xlsx')
-    print("\n" + "-" * 50 + "\n")
+            if "Fail" in result:
+                url_failures[call['url']] = url_failures.get(call['url'], 0) + 1
+                dimension_failures[param_name] = dimension_failures.get(param_name, 0) + 1
+    
+    return url_failures, dimension_failures
 
+def write_results_to_excel(url_failures, dimension_failures, output_file='harmony_test_results.xlsx'):
+    """Write URL and dimension failures to an Excel file."""
+    workbook = openpyxl.load_workbook('template.xlsx')
+    sheet = workbook.active
+    
+    # Write URL Failures
+    sheet['D1'], sheet['E1'] = 'URL Failures', 'Count'
+    for row_num, (url, count) in enumerate(url_failures.items(), start=2):
+        sheet.cell(row=row_num, column=4, value=url)
+        sheet.cell(row=row_num, column=5, value=count)
+    
+    # Write Dimension Failures
+    sheet['G1'], sheet['H1'] = 'Dimension Failures', 'Count'
+    for row_num, (dimension, count) in enumerate(dimension_failures.items(), start=2):
+        sheet.cell(row=row_num, column=7, value=dimension)
+        sheet.cell(row=row_num, column=8, value=count)
+    
+    workbook.save(output_file)
+    print(f"Results saved to {output_file}")
+
+def main():
+    """Main execution function to process HAR file and test cases."""
+    har_file_path = find_har_file()
+    if not har_file_path:
+        print("No HAR file found. Exiting.")
+        return
+    
+    har_data = load_har_file(har_file_path)
+    test_cases = load_tests_from_xlsx('test_cases.xlsx')
+    
+    adobe_calls = parse_har_for_adobe_calls(har_data, test_cases)
+    url_failures, dimension_failures = analyze_failures(adobe_calls)
+    
+    write_results_to_excel(url_failures, dimension_failures)
+    
+    # Print results to console
+    for call in adobe_calls:
+        print(f"\nURL: {call['url']}")
+        print("Parameters:")
+        print(json.dumps(combine_nested_keys(call['parameters']), indent=2))
+        print("\nPayload:")
+        print("No payload" if call['payload'] == "No payload" else json.dumps(call['payload'], indent=2))
+        print("\nResults:")
+        for result in call.get("results", []):
+            print(result)
+        print("-" * 50)
 
 if __name__ == "__main__":
     main()
