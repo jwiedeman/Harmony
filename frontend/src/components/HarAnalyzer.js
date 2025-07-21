@@ -1,21 +1,45 @@
-import React, { useState, useRef } from 'react';
-import { Upload, FileText, Play, CheckCircle, XCircle } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Upload, FileText, Play, CheckCircle, XCircle, Folder, Clock } from 'lucide-react';
 
 const HarAnalyzer = ({ onAnalysisComplete }) => {
   const [file, setFile] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [message, setMessage] = useState('');
+  const [availableHarFiles, setAvailableHarFiles] = useState([]);
+  const [selectedHarFile, setSelectedHarFile] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Fetch available HAR files on component mount
+  useEffect(() => {
+    fetchAvailableHarFiles();
+  }, []);
+
+  const fetchAvailableHarFiles = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/har-files`);
+      const data = await response.json();
+      setAvailableHarFiles(data.har_files || []);
+    } catch (error) {
+      console.error('Error fetching available HAR files:', error);
+    }
+  };
 
   const handleFileSelect = (selectedFile) => {
     if (selectedFile && selectedFile.name.endsWith('.har')) {
       setFile(selectedFile);
+      setSelectedHarFile(null); // Clear selected existing file
       setMessage('');
     } else {
       setMessage('ERROR: Please select a valid HAR file');
       setFile(null);
     }
+  };
+
+  const handleExistingFileSelect = (harFile) => {
+    setSelectedHarFile(harFile);
+    setFile(null); // Clear uploaded file
+    setMessage('');
   };
 
   const handleDrop = (e) => {
@@ -40,7 +64,7 @@ const HarAnalyzer = ({ onAnalysisComplete }) => {
   };
 
   const handleAnalyze = async () => {
-    if (!file) {
+    if (!file && !selectedHarFile) {
       setMessage('ERROR: Please select a HAR file first');
       return;
     }
@@ -49,13 +73,23 @@ const HarAnalyzer = ({ onAnalysisComplete }) => {
     setMessage('ANALYZING HAR FILE...');
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      let response;
+      
+      if (selectedHarFile) {
+        // Analyze existing HAR file
+        response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/analyze-har-file/${selectedHarFile.filename}`, {
+          method: 'POST',
+        });
+      } else {
+        // Analyze uploaded HAR file
+        const formData = new FormData();
+        formData.append('file', file);
 
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/analyze-har`, {
-        method: 'POST',
-        body: formData,
-      });
+        response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/analyze-har`, {
+          method: 'POST',
+          body: formData,
+        });
+      }
 
       const data = await response.json();
 
@@ -81,6 +115,10 @@ const HarAnalyzer = ({ onAnalysisComplete }) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  const formatTimestamp = (timestamp) => {
+    return new Date(parseFloat(timestamp) * 1000).toLocaleString();
+  };
+
   return (
     <div className="har-analyzer">
       <div className="section-header">
@@ -94,6 +132,68 @@ const HarAnalyzer = ({ onAnalysisComplete }) => {
         </div>
       )}
 
+      {/* Available HAR Files Section */}
+      {availableHarFiles.length > 0 && (
+        <div className="card">
+          <div className="card-header">
+            AVAILABLE HAR FILES ({availableHarFiles.length})
+          </div>
+          <div className="card-body">
+            <div className="har-files-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+              {availableHarFiles.map((harFile, index) => (
+                <div
+                  key={index}
+                  className={`har-file-card ${selectedHarFile?.filename === harFile.filename ? 'selected' : ''}`}
+                  style={{
+                    border: '2px solid #000000',
+                    padding: '16px',
+                    backgroundColor: selectedHarFile?.filename === harFile.filename ? '#f0f0f0' : '#ffffff',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onClick={() => handleExistingFileSelect(harFile)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <FileText size={20} />
+                    <strong>{harFile.filename}</strong>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#666' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                      <Folder size={14} />
+                      SIZE: {formatFileSize(harFile.size)}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Clock size={14} />
+                      MODIFIED: {formatTimestamp(harFile.modified)}
+                    </div>
+                  </div>
+                  {selectedHarFile?.filename === harFile.filename && (
+                    <div style={{ marginTop: '8px', color: '#000000', fontWeight: 'bold', fontSize: '12px' }}>
+                      ✓ SELECTED FOR ANALYSIS
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            
+            {selectedHarFile && (
+              <div className="selected-file-info" style={{ 
+                backgroundColor: '#f5f5f5', 
+                padding: '16px', 
+                border: '1px solid #000000',
+                marginBottom: '16px'
+              }}>
+                <h4>SELECTED FILE: {selectedHarFile.filename}</h4>
+                <p>Path: {selectedHarFile.path}</p>
+                <p>Size: {formatFileSize(selectedHarFile.size)}</p>
+                <p>Modified: {formatTimestamp(selectedHarFile.modified)}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Upload Section */}
       <div className="card">
         <div className="card-header">
           FILE UPLOAD INTERFACE
@@ -118,6 +218,9 @@ const HarAnalyzer = ({ onAnalysisComplete }) => {
               <Upload size={48} style={{ marginBottom: '16px' }} />
               <h3>DROP HAR FILE HERE OR CLICK TO SELECT</h3>
               <p>SUPPORTED FORMAT: .HAR (HTTP ARCHIVE)</p>
+              <p style={{ fontSize: '12px', marginTop: '8px' }}>
+                OR SELECT FROM AVAILABLE FILES ABOVE
+              </p>
               {file && (
                 <div className="file-info" style={{ marginTop: '20px' }}>
                   <div className="flex items-center" style={{ justifyContent: 'center', gap: '8px' }}>
@@ -131,7 +234,7 @@ const HarAnalyzer = ({ onAnalysisComplete }) => {
             </div>
           </div>
 
-          {file && (
+          {(file || selectedHarFile) && (
             <div className="mt-2">
               <button
                 className="btn btn-primary"
@@ -183,7 +286,7 @@ const HarAnalyzer = ({ onAnalysisComplete }) => {
               <h4>REQUIREMENTS</h4>
               <ul style={{ listStyle: 'none', padding: 0, marginTop: '12px' }}>
                 <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {file ? <CheckCircle size={16} color="green" /> : <XCircle size={16} />}
+                  {(file || selectedHarFile) ? <CheckCircle size={16} color="green" /> : <XCircle size={16} />}
                   VALID HAR FILE SELECTED
                 </li>
                 <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
