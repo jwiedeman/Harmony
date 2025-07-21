@@ -1,0 +1,372 @@
+/* NASA 1970s Computer Terminal Aesthetic */
+@import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Courier Prime', 'Courier New', monospace;
+  background-color: #ffffff;
+  color: #000000;
+  line-height: 1.4;
+  font-size: 14px;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.app-header {
+  background-color: #000000;
+  color: #ffffff;
+  padding: 12px 0;
+  border-bottom: 3px solid #000000;
+}
+
+.header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-section h1 {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.status-section {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #666;
+}
+
+.status-dot.active {
+  background-color: #00ff00;
+}
+
+/* Navigation */
+.app-nav {
+  background-color: #ffffff;
+  border-bottom: 1px solid #000000;
+  padding: 0;
+}
+
+.nav-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  gap: 0;
+}
+
+.nav-tab {
+  background: none;
+  border: none;
+  padding: 16px 24px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: #000000;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+}
+
+.nav-tab:hover {
+  background-color: #f5f5f5;
+}
+
+.nav-tab.active {
+  border-bottom-color: #000000;
+  background-color: #f0f0f0;
+}
+
+/* Main Content */
+.app-main {
+  flex: 1;
+  background-color: #ffffff;
+}
+
+.main-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+/* Footer */
+.app-footer {
+  background-color: #000000;
+  color: #ffffff;
+  padding: 12px 0;
+  border-top: 1px solid #000000;
+}
+
+.footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+/* Form Elements */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.form-input,
+.form-textarea,
+.form-select {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #000000;
+  background-color: #ffffff;
+  font-family: inherit;
+  font-size: 14px;
+  color: #000000;
+}
+
+.form-input:focus,
+.form-textarea:focus,
+.form-select:focus {
+  outline: none;
+  background-color: #f8f8f8;
+}
+
+.form-textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* Buttons */
+.btn {
+  padding: 12px 24px;
+  border: 2px solid #000000;
+  background-color: #ffffff;
+  color: #000000;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.2s;
+}
+
+.btn:hover {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.btn-primary {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background-color: #333333;
+}
+
+.btn-small {
+  padding: 8px 16px;
+  font-size: 12px;
+}
+
+.btn-danger {
+  border-color: #000000;
+  color: #000000;
+}
+
+.btn-danger:hover {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+/* Cards */
+.card {
+  border: 2px solid #000000;
+  background-color: #ffffff;
+  margin-bottom: 20px;
+}
+
+.card-header {
+  background-color: #f5f5f5;
+  padding: 16px;
+  border-bottom: 1px solid #000000;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.card-body {
+  padding: 20px;
+}
+
+/* Tables */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 2px solid #000000;
+  background-color: #ffffff;
+}
+
+.table th,
+.table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #000000;
+  font-family: inherit;
+}
+
+.table th {
+  background-color: #f5f5f5;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Upload Area */
+.upload-area {
+  border: 3px dashed #000000;
+  padding: 40px;
+  text-align: center;
+  background-color: #fafafa;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.upload-area:hover,
+.upload-area.drag-over {
+  background-color: #f0f0f0;
+}
+
+.upload-area.uploading {
+  border-style: solid;
+  background-color: #f8f8f8;
+}
+
+/* Status Messages */
+.status-message {
+  padding: 16px;
+  margin: 16px 0;
+  border: 2px solid #000000;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.status-message.success {
+  background-color: #f0f8f0;
+  color: #000000;
+}
+
+.status-message.error {
+  background-color: #f8f0f0;
+  color: #000000;
+}
+
+.status-message.info {
+  background-color: #f0f0f8;
+  color: #000000;
+}
+
+/* Progress Bar */
+.progress-bar {
+  width: 100%;
+  height: 20px;
+  border: 2px solid #000000;
+  background-color: #ffffff;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: #000000;
+  transition: width 0.3s ease;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .header-content,
+  .nav-content,
+  .main-content,
+  .footer-content {
+    padding: 0 16px;
+  }
+  
+  .nav-content {
+    flex-wrap: wrap;
+  }
+  
+  .nav-tab {
+    padding: 12px 16px;
+    font-size: 12px;
+  }
+  
+  .logo-section h1 {
+    font-size: 18px;
+  }
+}
+
+/* Utility Classes */
+.text-center { text-align: center; }
+.text-uppercase { text-transform: uppercase; }
+.font-bold { font-weight: 700; }
+.mb-0 { margin-bottom: 0; }
+.mb-1 { margin-bottom: 8px; }
+.mb-2 { margin-bottom: 16px; }
+.mb-3 { margin-bottom: 24px; }
+.mt-2 { margin-top: 16px; }
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: 16px; }
