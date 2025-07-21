@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Download, 
+import { BACKEND_URL } from '../config';
   CheckCircle, 
   XCircle, 
   AlertCircle, 
@@ -35,7 +36,7 @@ const ResultsDashboard = ({ report }) => {
   const handleExportReport = async () => {
     try {
       // This would need the report ID from the backend
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/reports/export`, {
+      const response = await fetch(`${BACKEND_URL}/api/reports/export`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(report)

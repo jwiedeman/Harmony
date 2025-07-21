@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, FileText, Play, CheckCircle, XCircle, Folder, Clock } from 'lucide-react';
+import { BACKEND_URL } from '../config';
 
 const HarAnalyzer = ({ onAnalysisComplete }) => {
   const [file, setFile] = useState(null);
@@ -17,7 +18,7 @@ const HarAnalyzer = ({ onAnalysisComplete }) => {
 
   const fetchAvailableHarFiles = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/har-files`);
+      const response = await fetch(`${BACKEND_URL}/api/har-files`);
       const data = await response.json();
       setAvailableHarFiles(data.har_files || []);
     } catch (error) {
@@ -77,7 +78,7 @@ const HarAnalyzer = ({ onAnalysisComplete }) => {
       
       if (selectedHarFile) {
         // Analyze existing HAR file
-        response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/analyze-har-file/${selectedHarFile.filename}`, {
+        response = await fetch(`${BACKEND_URL}/api/analyze-har-file/${selectedHarFile.filename}`, {
           method: 'POST',
         });
       } else {
@@ -85,7 +86,7 @@ const HarAnalyzer = ({ onAnalysisComplete }) => {
         const formData = new FormData();
         formData.append('file', file);
 
-        response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/analyze-har`, {
+        response = await fetch(`${BACKEND_URL}/api/analyze-har`, {
           method: 'POST',
           body: formData,
         });

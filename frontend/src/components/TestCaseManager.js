@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import { BACKEND_URL } from '../config';
 
 const TestCaseManager = ({ testCases, onTestCasesUpdate }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -50,7 +51,7 @@ const TestCaseManager = ({ testCases, onTestCasesUpdate }) => {
       
       if (editingCase) {
         // Update existing test case
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/test-cases/${editingCase.id}`, {
+        const response = await fetch(`${BACKEND_URL}/api/test-cases/${editingCase.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...testCase, id: editingCase.id })
@@ -61,7 +62,7 @@ const TestCaseManager = ({ testCases, onTestCasesUpdate }) => {
         }
       } else {
         // Create new test case
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/test-cases`, {
+        const response = await fetch(`${BACKEND_URL}/api/test-cases`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(testCase)
@@ -102,7 +103,7 @@ const TestCaseManager = ({ testCases, onTestCasesUpdate }) => {
   const handleDelete = async (testCaseId) => {
     if (window.confirm('CONFIRM DELETION OF TEST CASE?')) {
       try {
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/test-cases/${testCaseId}`, {
+        const response = await fetch(`${BACKEND_URL}/api/test-cases/${testCaseId}`, {
           method: 'DELETE'
         });
         
