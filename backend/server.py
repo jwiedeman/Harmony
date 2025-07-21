@@ -359,12 +359,18 @@ async def analyze_har_file_by_name(filename: str):
         if not har_file:
             raise HTTPException(status_code=404, detail=f"HAR file '{filename}' not found")
         
+        # Construct full path - check if it's already a relative path from project root
+        if har_file.path.startswith('../'):
+            full_path = har_file.path
+        else:
+            full_path = os.path.join("../", har_file.path)
+        
         # Read and parse HAR file
-        with open(har_file.path, 'r', encoding='utf-8') as f:
+        with open(full_path, 'r', encoding='utf-8') as f:
             har_data = json.load(f)
         
         # Get test cases from Excel
-        test_cases = load_tests_from_xlsx()
+        test_cases = load_tests_from_xlsx('../test_cases.xlsx')
         if not test_cases:
             raise HTTPException(status_code=400, detail="No test cases found in test_cases.xlsx. Please create test cases first.")
         
