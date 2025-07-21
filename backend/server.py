@@ -11,6 +11,8 @@ from collections import OrderedDict
 from urllib.parse import urlparse, parse_qs
 import tempfile
 import shutil
+import glob
+from openpyxl import load_workbook
 
 app = FastAPI(title="Harmony QA API", description="QA Testing API for HAR file analysis")
 
@@ -53,9 +55,120 @@ class AnalysisReport(BaseModel):
     detailed_results: List[TestResult]
     raw_data: List[Dict[str, Any]]
 
-# In-memory storage (in production, use MongoDB)
-test_cases_store = {}
+class HarFile(BaseModel):
+    filename: str
+    path: str
+    size: int
+    modified: str
+
+# In-memory storage for analysis results
 analysis_results_store = {}
+
+# Function to load test cases from Excel file
+def load_tests_from_xlsx(xlsx_path='test_cases.xlsx'):
+    """Load test cases from Excel file, similar to the original helper function."""
+    test_cases = []
+    try:
+        workbook = load_workbook(xlsx_path)
+        sheet = workbook.active
+        
+        for row_num, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+            if not row[0]:  # Skip empty rows
+                continue
+                
+            # Handle None values and convert to appropriate types
+            target_urls = row[2].split(',') if row[2] else []
+            target_urls = [url.strip() for url in target_urls if url.strip()]
+            
+            test_case = TestCase(
+                id=str(uuid.uuid4()),
+                name=str(row[0]) if row[0] else f"Test Case {row_num}",
+                description=str(row[1]) if row[1] else "",
+                target_urls=target_urls,
+                parameter_name=str(row[3]) if row[3] else "",
+                condition=str(row[4]).lower() if row[4] else "exists",
+                expected_value=str(row[5]) if row[5] and row[5] != "None" else None,
+                optional=str(row[6]).lower() == 'true' if row[6] else False,
+                on_pass_message=str(row[7]) if row[7] else f"Parameter {row[3]} found: {{value}}",
+                on_fail_message=str(row[8]) if row[8] else f"Parameter {row[3]} missing from {{url}}"
+            )
+            test_cases.append(test_case)
+            
+        print(f"Loaded {len(test_cases)} test cases from {xlsx_path}")
+        return test_cases
+        
+    except FileNotFoundError:
+        print(f"Test cases file {xlsx_path} not found. Using empty test case list.")
+        return []
+    except Exception as e:
+        print(f"Error loading test cases from {xlsx_path}: {e}")
+        return []
+
+# Function to save test cases to Excel file
+def save_tests_to_xlsx(test_cases: List[TestCase], xlsx_path='test_cases.xlsx'):
+    """Save test cases to Excel file."""
+    try:
+        # Create new workbook
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.title = "Test Cases"
+        
+        # Headers
+        headers = [
+            "Test Name", "Description", "Target URLs", "Parameter Name", 
+            "Condition", "Expected Value", "Optional", "On Pass Message", "On Fail Message"
+        ]
+        
+        for col, header in enumerate(headers, 1):
+            sheet.cell(row=1, column=col, value=header)
+        
+        # Data
+        for row, test_case in enumerate(test_cases, 2):
+            sheet.cell(row=row, column=1, value=test_case.name)
+            sheet.cell(row=row, column=2, value=test_case.description)
+            sheet.cell(row=row, column=3, value=', '.join(test_case.target_urls))
+            sheet.cell(row=row, column=4, value=test_case.parameter_name)
+            sheet.cell(row=row, column=5, value=test_case.condition)
+            sheet.cell(row=row, column=6, value=test_case.expected_value or "")
+            sheet.cell(row=row, column=7, value=str(test_case.optional))
+            sheet.cell(row=row, column=8, value=test_case.on_pass_message)
+            sheet.cell(row=row, column=9, value=test_case.on_fail_message)
+        
+        workbook.save(xlsx_path)
+        print(f"Saved {len(test_cases)} test cases to {xlsx_path}")
+        return True
+        
+    except Exception as e:
+        print(f"Error saving test cases to {xlsx_path}: {e}")
+        return False
+
+# Function to get available HAR files
+def get_available_har_files():
+    """Get list of available HAR files in the current directory."""
+    har_files = []
+    
+    # Look for HAR files in current directory and common subdirectories
+    search_paths = [
+        "*.har",
+        "data/*.har", 
+        "samples/*.har",
+        "test_data/*.har"
+    ]
+    
+    for pattern in search_paths:
+        for file_path in glob.glob(pattern):
+            try:
+                stat = os.stat(file_path)
+                har_files.append(HarFile(
+                    filename=os.path.basename(file_path),
+                    path=file_path,
+                    size=stat.st_size,
+                    modified=str(stat.st_mtime)
+                ))
+            except OSError:
+                continue
+    
+    return har_files
 
 # Helper functions (ported from original helper_functions.py)
 def extract_parameters(url: str, post_data_params: dict) -> dict:
@@ -155,29 +268,130 @@ async def health_check():
 
 @app.get("/api/test-cases")
 async def get_test_cases():
-    return {"test_cases": list(test_cases_store.values())}
+    test_cases = load_tests_from_xlsx()
+    return {"test_cases": [tc.dict() for tc in test_cases]}
 
 @app.post("/api/test-cases")
 async def create_test_case(test_case: TestCase):
+    # Load existing test cases
+    test_cases = load_tests_from_xlsx()
+    
+    # Add new test case
     if not test_case.id:
         test_case.id = str(uuid.uuid4())
-    test_cases_store[test_case.id] = test_case
-    return {"message": "Test case created successfully", "id": test_case.id}
+    
+    test_cases.append(test_case)
+    
+    # Save back to Excel
+    if save_tests_to_xlsx(test_cases):
+        return {"message": "Test case created successfully", "id": test_case.id}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to save test case")
 
 @app.put("/api/test-cases/{test_case_id}")
 async def update_test_case(test_case_id: str, test_case: TestCase):
-    if test_case_id not in test_cases_store:
+    # Load existing test cases
+    test_cases = load_tests_from_xlsx()
+    
+    # Find and update the test case
+    updated = False
+    for i, tc in enumerate(test_cases):
+        if tc.id == test_case_id:
+            test_case.id = test_case_id
+            test_cases[i] = test_case
+            updated = True
+            break
+    
+    if not updated:
         raise HTTPException(status_code=404, detail="Test case not found")
-    test_case.id = test_case_id
-    test_cases_store[test_case_id] = test_case
-    return {"message": "Test case updated successfully"}
+    
+    # Save back to Excel
+    if save_tests_to_xlsx(test_cases):
+        return {"message": "Test case updated successfully"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to update test case")
 
 @app.delete("/api/test-cases/{test_case_id}")
 async def delete_test_case(test_case_id: str):
-    if test_case_id not in test_cases_store:
-        raise HTTPException(status_code=404, detail="Test case not found")
-    del test_cases_store[test_case_id]
-    return {"message": "Test case deleted successfully"}
+    # Load existing test cases
+    test_cases = load_tests_from_xlsx()
+    
+    # Find and remove the test case
+    test_cases = [tc for tc in test_cases if tc.id != test_case_id]
+    
+    # Save back to Excel
+    if save_tests_to_xlsx(test_cases):
+        return {"message": "Test case deleted successfully"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to delete test case")
+
+@app.get("/api/har-files")
+async def get_har_files():
+    har_files = get_available_har_files()
+    return {"har_files": [hf.dict() for hf in har_files]}
+
+@app.post("/api/analyze-har-file/{filename}")
+async def analyze_har_file_by_name(filename: str):
+    """Analyze a HAR file that exists in the project directory."""
+    try:
+        # Find the HAR file
+        har_files = get_available_har_files()
+        har_file = next((hf for hf in har_files if hf.filename == filename), None)
+        
+        if not har_file:
+            raise HTTPException(status_code=404, detail=f"HAR file '{filename}' not found")
+        
+        # Read and parse HAR file
+        with open(har_file.path, 'r', encoding='utf-8') as f:
+            har_data = json.load(f)
+        
+        # Get test cases from Excel
+        test_cases = load_tests_from_xlsx()
+        if not test_cases:
+            raise HTTPException(status_code=400, detail="No test cases found in test_cases.xlsx. Please create test cases first.")
+        
+        # Analyze the HAR file
+        calls = parse_har_for_calls(har_data, test_cases)
+        url_failures, dimension_failures = analyze_failures(calls)
+        
+        # Create detailed results
+        detailed_results = []
+        for call in calls:
+            for result, param_name, test_name in call.get("results", []):
+                detailed_results.append(TestResult(
+                    url=call["url"],
+                    parameter=param_name,
+                    result="Pass" if "Pass" in result else "Fail",
+                    details=result,
+                    test_case_name=test_name
+                ))
+        
+        # Create analysis report
+        total_tests = len(detailed_results)
+        passed_tests = len([r for r in detailed_results if r.result == "Pass"])
+        failed_tests = total_tests - passed_tests
+        
+        report = AnalysisReport(
+            total_requests=len(calls),
+            total_tests=total_tests,
+            passed_tests=passed_tests,
+            failed_tests=failed_tests,
+            url_failures=url_failures,
+            dimension_failures=dimension_failures,
+            detailed_results=detailed_results,
+            raw_data=calls
+        )
+        
+        # Store results
+        report_id = str(uuid.uuid4())
+        analysis_results_store[report_id] = report
+        
+        return {"report_id": report_id, "report": report}
+        
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid HAR file format")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 @app.post("/api/analyze-har")
 async def analyze_har(file: UploadFile = File(...)):
@@ -189,10 +403,10 @@ async def analyze_har(file: UploadFile = File(...)):
         contents = await file.read()
         har_data = json.loads(contents.decode('utf-8'))
         
-        # Get active test cases
-        test_cases = list(test_cases_store.values())
+        # Get test cases from Excel
+        test_cases = load_tests_from_xlsx()
         if not test_cases:
-            raise HTTPException(status_code=400, detail="No test cases defined. Please create test cases first.")
+            raise HTTPException(status_code=400, detail="No test cases found in test_cases.xlsx. Please create test cases first.")
         
         # Analyze the HAR file
         calls = parse_har_for_calls(har_data, test_cases)
