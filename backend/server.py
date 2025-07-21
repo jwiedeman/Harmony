@@ -69,6 +69,12 @@ def load_tests_from_xlsx(xlsx_path='test_cases.xlsx'):
     """Load test cases from Excel file, similar to the original helper function."""
     test_cases = []
     try:
+        # If path doesn't exist, try looking in parent directory
+        if not os.path.exists(xlsx_path):
+            parent_path = os.path.join("../", os.path.basename(xlsx_path))
+            if os.path.exists(parent_path):
+                xlsx_path = parent_path
+        
         workbook = load_workbook(xlsx_path)
         sheet = workbook.active
         
