@@ -144,31 +144,49 @@ def save_tests_to_xlsx(test_cases: List[TestCase], xlsx_path='test_cases.xlsx'):
 
 # Function to get available HAR files
 def get_available_har_files():
-    """Get list of available HAR files in the current directory."""
+    """Get list of available HAR files in the project directory."""
     har_files = []
     
-    # Look for HAR files in current directory and common subdirectories
-    search_paths = [
-        "*.har",
-        "data/*.har", 
-        "samples/*.har",
-        "test_data/*.har"
+    # Look for HAR files in parent directory (project root) and common subdirectories  
+    base_paths = [
+        "../",  # Project root
+        "../data/", 
+        "../samples/",
+        "../test_data/",
+        "./",  # Current directory
+        "data/",
+        "samples/", 
+        "test_data/"
     ]
     
-    for pattern in search_paths:
-        for file_path in glob.glob(pattern):
-            try:
-                stat = os.stat(file_path)
-                har_files.append(HarFile(
-                    filename=os.path.basename(file_path),
-                    path=file_path,
-                    size=stat.st_size,
-                    modified=str(stat.st_mtime)
-                ))
-            except OSError:
-                continue
+    for base_path in base_paths:
+        try:
+            search_pattern = os.path.join(base_path, "*.har")
+            for file_path in glob.glob(search_pattern):
+                try:
+                    stat = os.stat(file_path)
+                    # Get relative path from project root
+                    rel_path = os.path.relpath(file_path, "../")
+                    har_files.append(HarFile(
+                        filename=os.path.basename(file_path),
+                        path=rel_path,
+                        size=stat.st_size,
+                        modified=str(stat.st_mtime)
+                    ))
+                except OSError:
+                    continue
+        except:
+            continue
     
-    return har_files
+    # Remove duplicates based on filename
+    seen_files = set()
+    unique_har_files = []
+    for har_file in har_files:
+        if har_file.filename not in seen_files:
+            unique_har_files.append(har_file)
+            seen_files.add(har_file.filename)
+    
+    return unique_har_files
 
 # Helper functions (ported from original helper_functions.py)
 def extract_parameters(url: str, post_data_params: dict) -> dict:
