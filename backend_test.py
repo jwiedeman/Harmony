@@ -75,6 +75,7 @@ class HarmonyAPITester:
     def test_create_test_case(self):
         """Create a test case"""
         test_case_data = {
+            "id": "",  # Backend will generate UUID if empty
             "name": "App Build Parameter Test",
             "description": "Check if app_build parameter exists in requests",
             "target_urls": ["example.com"],
