@@ -114,6 +114,11 @@ def load_tests_from_xlsx(xlsx_path='test_cases.xlsx'):
 def save_tests_to_xlsx(test_cases: List[TestCase], xlsx_path='test_cases.xlsx'):
     """Save test cases to Excel file."""
     try:
+        # If path doesn't exist, try parent directory
+        if not os.path.exists(os.path.dirname(xlsx_path)) and xlsx_path != os.path.basename(xlsx_path):
+            parent_path = os.path.join("../", os.path.basename(xlsx_path))
+            xlsx_path = parent_path
+        
         # Create new workbook
         workbook = openpyxl.Workbook()
         sheet = workbook.active
