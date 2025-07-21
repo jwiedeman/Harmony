@@ -48,6 +48,10 @@ Right-click "launch-windows.bat" → "Run as Administrator"
 - Open your browser to the application
 
 ---
+## Standalone Web Version
+
+Place `test_cases.xlsx` and your HAR files in the `standalone` folder. Open `standalone/index.html` in a modern browser to run all analysis locally without a backend.
+
 
 ## 📋 System Requirements Check
 

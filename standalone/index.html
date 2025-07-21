@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Harmony QA Standalone</title>
+<style>
+body {
+    font-family: monospace;
+    background: #ffffff;
+    color: #000000;
+    margin: 20px;
+}
+h1 {
+    font-size: 24px;
+}
+label {
+    display: block;
+    margin-bottom: 10px;
+}
+#results {
+    margin-top: 20px;
+}
+summary {
+    cursor: pointer;
+}
+</style>
+</head>
+<body>
+<h1>Harmony QA Standalone</h1>
+<p>Select your <code>test_cases.xlsx</code> and a HAR file to run analysis directly in the browser.</p>
+<label>Test Cases Excel:
+    <input type="file" id="testCasesInput" accept=".xlsx" />
+</label>
+<label>HAR File:
+    <input type="file" id="harInput" accept=".har,application/json" />
+</label>
+<button id="analyzeBtn">Analyze</button>
+<div id="results"></div>
+<script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
