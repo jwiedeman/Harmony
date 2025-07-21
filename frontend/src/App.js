@@ -4,6 +4,7 @@ import TestCaseManager from './components/TestCaseManager';
 import HarAnalyzer from './components/HarAnalyzer';
 import ResultsDashboard from './components/ResultsDashboard';
 import { FileText, Upload, BarChart3, Settings } from 'lucide-react';
+import { BACKEND_URL } from './config';
 
 const App = () => {
   const [activeTab, setActiveTab] = useState('test-cases');
@@ -23,7 +24,7 @@ const App = () => {
 
   const fetchTestCases = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/test-cases`);
+      const response = await fetch(`${BACKEND_URL}/api/test-cases`);
       const data = await response.json();
       setTestCases(data.test_cases || []);
     } catch (error) {
