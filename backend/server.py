@@ -1,0 +1,310 @@
+import os
+import json
+import uuid
+from typing import List, Dict, Any, Optional
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+import openpyxl
+from collections import OrderedDict
+from urllib.parse import urlparse, parse_qs
+import tempfile
+import shutil
+
+app = FastAPI(title="Harmony QA API", description="QA Testing API for HAR file analysis")
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Pydantic models
+class TestCase(BaseModel):
+    id: str
+    name: str
+    description: str
+    target_urls: List[str]
+    parameter_name: str
+    condition: str
+    expected_value: Optional[str] = None
+    optional: bool = False
+    on_pass_message: str
+    on_fail_message: str
+
+class TestResult(BaseModel):
+    url: str
+    parameter: str
+    result: str
+    details: str
+    test_case_name: str
+
+class AnalysisReport(BaseModel):
+    total_requests: int
+    total_tests: int
+    passed_tests: int
+    failed_tests: int
+    url_failures: Dict[str, int]
+    dimension_failures: Dict[str, int]
+    detailed_results: List[TestResult]
+    raw_data: List[Dict[str, Any]]
+
+# In-memory storage (in production, use MongoDB)
+test_cases_store = {}
+analysis_results_store = {}
+
+# Helper functions (ported from original helper_functions.py)
+def extract_parameters(url: str, post_data_params: dict) -> dict:
+    parsed_url = urlparse(url)
+    url_params = parse_qs(parsed_url.query)
+    url_params = {key: value[0] for key, value in url_params.items()}
+    combined_params = {**url_params, **post_data_params}
+    return combined_params
+
+def apply_test_cases(call: dict, test_cases: List[TestCase]) -> List[tuple]:
+    results = []
+    parsed_url = urlparse(call["url"])
+    call_domain = parsed_url.netloc
+    
+    for test in test_cases:
+        # Check if this test applies to this URL
+        if test.target_urls and not any(target in call_domain or target in call["url"] for target in test.target_urls):
+            continue
+        
+        param_value = call["parameters"].get(test.parameter_name)
+        
+        if test.condition == "exists":
+            if param_value is not None:
+                result_msg = test.on_pass_message.format(value=param_value, url=call["url"])
+                results.append((f"Pass: {result_msg}", test.parameter_name, test.name))
+            else:
+                if not test.optional:
+                    result_msg = test.on_fail_message.format(url=call["url"])
+                    results.append((f"Fail: {result_msg}", test.parameter_name, test.name))
+        
+        elif test.condition == "equals":
+            if param_value is not None:
+                if str(param_value) == str(test.expected_value):
+                    result_msg = test.on_pass_message.format(value=param_value, url=call["url"])
+                    results.append((f"Pass: {result_msg}", test.parameter_name, test.name))
+                else:
+                    result_msg = test.on_fail_message.format(url=call["url"])
+                    results.append((f"Fail: Expected '{test.expected_value}' but got '{param_value}'", test.parameter_name, test.name))
+            else:
+                if not test.optional:
+                    result_msg = test.on_fail_message.format(url=call["url"])
+                    results.append((f"Fail: {result_msg}", test.parameter_name, test.name))
+    
+    return results
+
+def parse_har_for_calls(har_data: dict, test_cases: List[TestCase]) -> List[dict]:
+    calls = []
+    for entry in har_data['log']['entries']:
+        url = entry['request']['url']
+        post_data = entry['request'].get('postData', {})
+        
+        # Parse POST data parameters
+        post_data_params = {}
+        if 'params' in post_data:
+            post_data_params = {param["name"]: param["value"] for param in post_data.get('params', [])}
+        elif 'text' in post_data:
+            try:
+                # Try to parse JSON from post data text
+                json_data = json.loads(post_data['text'])
+                if isinstance(json_data, dict):
+                    post_data_params = json_data
+            except:
+                pass
+        
+        parameters = extract_parameters(url, post_data_params)
+        
+        call = {
+            "url": url,
+            "method": entry['request']['method'],
+            "parameters": parameters,
+            "payload": post_data.get("text", "No payload"),
+            "status": entry['response']['status']
+        }
+        
+        results = apply_test_cases(call, test_cases)
+        call["results"] = results
+        calls.append(call)
+    
+    return calls
+
+def analyze_failures(calls: List[dict]) -> tuple:
+    url_failures = {}
+    dimension_failures = {}
+    
+    for call in calls:
+        for result, param_name, test_name in call.get("results", []):
+            if "Fail" in result:
+                url_failures[call['url']] = url_failures.get(call['url'], 0) + 1
+                dimension_failures[param_name] = dimension_failures.get(param_name, 0) + 1
+    
+    return url_failures, dimension_failures
+
+# API Endpoints
+@app.get("/api/health")
+async def health_check():
+    return {"status": "healthy", "service": "Harmony QA API"}
+
+@app.get("/api/test-cases")
+async def get_test_cases():
+    return {"test_cases": list(test_cases_store.values())}
+
+@app.post("/api/test-cases")
+async def create_test_case(test_case: TestCase):
+    if not test_case.id:
+        test_case.id = str(uuid.uuid4())
+    test_cases_store[test_case.id] = test_case
+    return {"message": "Test case created successfully", "id": test_case.id}
+
+@app.put("/api/test-cases/{test_case_id}")
+async def update_test_case(test_case_id: str, test_case: TestCase):
+    if test_case_id not in test_cases_store:
+        raise HTTPException(status_code=404, detail="Test case not found")
+    test_case.id = test_case_id
+    test_cases_store[test_case_id] = test_case
+    return {"message": "Test case updated successfully"}
+
+@app.delete("/api/test-cases/{test_case_id}")
+async def delete_test_case(test_case_id: str):
+    if test_case_id not in test_cases_store:
+        raise HTTPException(status_code=404, detail="Test case not found")
+    del test_cases_store[test_case_id]
+    return {"message": "Test case deleted successfully"}
+
+@app.post("/api/analyze-har")
+async def analyze_har(file: UploadFile = File(...)):
+    if not file.filename.endswith('.har'):
+        raise HTTPException(status_code=400, detail="Please upload a HAR file")
+    
+    try:
+        # Read and parse HAR file
+        contents = await file.read()
+        har_data = json.loads(contents.decode('utf-8'))
+        
+        # Get active test cases
+        test_cases = list(test_cases_store.values())
+        if not test_cases:
+            raise HTTPException(status_code=400, detail="No test cases defined. Please create test cases first.")
+        
+        # Analyze the HAR file
+        calls = parse_har_for_calls(har_data, test_cases)
+        url_failures, dimension_failures = analyze_failures(calls)
+        
+        # Create detailed results
+        detailed_results = []
+        for call in calls:
+            for result, param_name, test_name in call.get("results", []):
+                detailed_results.append(TestResult(
+                    url=call["url"],
+                    parameter=param_name,
+                    result="Pass" if "Pass" in result else "Fail",
+                    details=result,
+                    test_case_name=test_name
+                ))
+        
+        # Create analysis report
+        total_tests = len(detailed_results)
+        passed_tests = len([r for r in detailed_results if r.result == "Pass"])
+        failed_tests = total_tests - passed_tests
+        
+        report = AnalysisReport(
+            total_requests=len(calls),
+            total_tests=total_tests,
+            passed_tests=passed_tests,
+            failed_tests=failed_tests,
+            url_failures=url_failures,
+            dimension_failures=dimension_failures,
+            detailed_results=detailed_results,
+            raw_data=calls
+        )
+        
+        # Store results
+        report_id = str(uuid.uuid4())
+        analysis_results_store[report_id] = report
+        
+        return {"report_id": report_id, "report": report}
+        
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid HAR file format")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+@app.get("/api/reports/{report_id}")
+async def get_report(report_id: str):
+    if report_id not in analysis_results_store:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return analysis_results_store[report_id]
+
+@app.get("/api/reports")
+async def get_all_reports():
+    return {"reports": list(analysis_results_store.keys())}
+
+@app.post("/api/reports/{report_id}/export")
+async def export_report(report_id: str):
+    if report_id not in analysis_results_store:
+        raise HTTPException(status_code=404, detail="Report not found")
+    
+    report = analysis_results_store[report_id]
+    
+    # Create Excel file
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Test Results"
+    
+    # Headers
+    headers = ["URL", "Parameter", "Result", "Details", "Test Case"]
+    for col, header in enumerate(headers, 1):
+        sheet.cell(row=1, column=col, value=header)
+    
+    # Data
+    for row, result in enumerate(report.detailed_results, 2):
+        sheet.cell(row=row, column=1, value=result.url)
+        sheet.cell(row=row, column=2, value=result.parameter)
+        sheet.cell(row=row, column=3, value=result.result)
+        sheet.cell(row=row, column=4, value=result.details)
+        sheet.cell(row=row, column=5, value=result.test_case_name)
+    
+    # Summary sheet
+    summary_sheet = workbook.create_sheet("Summary")
+    summary_data = [
+        ["Metric", "Value"],
+        ["Total Requests", report.total_requests],
+        ["Total Tests", report.total_tests],
+        ["Passed Tests", report.passed_tests],
+        ["Failed Tests", report.failed_tests],
+        ["", ""],
+        ["URL Failures", "Count"]
+    ]
+    
+    for url, count in report.url_failures.items():
+        summary_data.append([url, count])
+    
+    summary_data.extend([["", ""], ["Parameter Failures", "Count"]])
+    for param, count in report.dimension_failures.items():
+        summary_data.append([param, count])
+    
+    for row, data in enumerate(summary_data, 1):
+        for col, value in enumerate(data, 1):
+            summary_sheet.cell(row=row, column=col, value=value)
+    
+    # Save to temp file
+    temp_file = f"/tmp/harmony_report_{report_id}.xlsx"
+    workbook.save(temp_file)
+    
+    return FileResponse(
+        temp_file,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=f"harmony_report_{report_id}.xlsx"
+    )
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8001)
