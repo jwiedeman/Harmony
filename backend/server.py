@@ -297,13 +297,13 @@ async def health_check():
 
 @app.get("/api/test-cases")
 async def get_test_cases():
-    test_cases = load_tests_from_xlsx()
+    test_cases = load_tests_from_xlsx('../test_cases.xlsx')
     return {"test_cases": [tc.dict() for tc in test_cases]}
 
 @app.post("/api/test-cases")
 async def create_test_case(test_case: TestCase):
     # Load existing test cases
-    test_cases = load_tests_from_xlsx()
+    test_cases = load_tests_from_xlsx('../test_cases.xlsx')
     
     # Add new test case
     if not test_case.id:
@@ -312,7 +312,7 @@ async def create_test_case(test_case: TestCase):
     test_cases.append(test_case)
     
     # Save back to Excel
-    if save_tests_to_xlsx(test_cases):
+    if save_tests_to_xlsx(test_cases, '../test_cases.xlsx'):
         return {"message": "Test case created successfully", "id": test_case.id}
     else:
         raise HTTPException(status_code=500, detail="Failed to save test case")
@@ -320,7 +320,7 @@ async def create_test_case(test_case: TestCase):
 @app.put("/api/test-cases/{test_case_id}")
 async def update_test_case(test_case_id: str, test_case: TestCase):
     # Load existing test cases
-    test_cases = load_tests_from_xlsx()
+    test_cases = load_tests_from_xlsx('../test_cases.xlsx')
     
     # Find and update the test case
     updated = False
@@ -335,7 +335,7 @@ async def update_test_case(test_case_id: str, test_case: TestCase):
         raise HTTPException(status_code=404, detail="Test case not found")
     
     # Save back to Excel
-    if save_tests_to_xlsx(test_cases):
+    if save_tests_to_xlsx(test_cases, '../test_cases.xlsx'):
         return {"message": "Test case updated successfully"}
     else:
         raise HTTPException(status_code=500, detail="Failed to update test case")
@@ -343,13 +343,13 @@ async def update_test_case(test_case_id: str, test_case: TestCase):
 @app.delete("/api/test-cases/{test_case_id}")
 async def delete_test_case(test_case_id: str):
     # Load existing test cases
-    test_cases = load_tests_from_xlsx()
+    test_cases = load_tests_from_xlsx('../test_cases.xlsx')
     
     # Find and remove the test case
     test_cases = [tc for tc in test_cases if tc.id != test_case_id]
     
     # Save back to Excel
-    if save_tests_to_xlsx(test_cases):
+    if save_tests_to_xlsx(test_cases, '../test_cases.xlsx'):
         return {"message": "Test case deleted successfully"}
     else:
         raise HTTPException(status_code=500, detail="Failed to delete test case")
