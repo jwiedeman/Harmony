@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { 
-  Download, 
-import { BACKEND_URL } from '../config';
-  CheckCircle, 
-  XCircle, 
-  AlertCircle, 
-  BarChart3, 
-  FileText, 
+import {
+  Download,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  BarChart3,
+  FileText,
   Globe,
   Settings
 } from 'lucide-react';
+import { BACKEND_URL } from '../config';
 
 const ResultsDashboard = ({ report }) => {
   const [activeView, setActiveView] = useState('summary');
