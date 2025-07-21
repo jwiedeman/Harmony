@@ -439,7 +439,7 @@ async def analyze_har(file: UploadFile = File(...)):
         har_data = json.loads(contents.decode('utf-8'))
         
         # Get test cases from Excel
-        test_cases = load_tests_from_xlsx()
+        test_cases = load_tests_from_xlsx('../test_cases.xlsx')
         if not test_cases:
             raise HTTPException(status_code=400, detail="No test cases found in test_cases.xlsx. Please create test cases first.")
         
