@@ -7,13 +7,23 @@ const TestGroupManager = ({ testGroups, testCases, onGroupsUpdate }) => {
   const [editingGroup, setEditingGroup] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
-    sequence: '',
-    within_seconds: ''
+    sequence: [],
+    selectedTest: '',
+    within_seconds: '',
+    on_pass_message: 'Group {name} passed',
+    on_fail_message: 'Group {name} failed'
   });
   const [message, setMessage] = useState('');
 
   const resetForm = () => {
-    setFormData({ name: '', sequence: '', within_seconds: '' });
+    setFormData({
+      name: '',
+      sequence: [],
+      selectedTest: '',
+      within_seconds: '',
+      on_pass_message: 'Group {name} passed',
+      on_fail_message: 'Group {name} failed'
+    });
   };
 
   const handleInputChange = (e) => {
@@ -21,13 +31,32 @@ const TestGroupManager = ({ testGroups, testCases, onGroupsUpdate }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleAddTest = () => {
+    if (formData.selectedTest) {
+      setFormData(prev => ({
+        ...prev,
+        sequence: [...prev.sequence, prev.selectedTest],
+        selectedTest: ''
+      }));
+    }
+  };
+
+  const handleRemoveTest = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      sequence: prev.sequence.filter((_, i) => i !== index)
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const group = {
-        ...formData,
-        sequence: formData.sequence.split(',').map(t => t.trim()).filter(t => t),
-        within_seconds: formData.within_seconds ? parseInt(formData.within_seconds) : null
+        name: formData.name,
+        sequence: formData.sequence,
+        within_seconds: formData.within_seconds ? parseInt(formData.within_seconds) : null,
+        on_pass_message: formData.on_pass_message,
+        on_fail_message: formData.on_fail_message
       };
       if (editingGroup) {
         const response = await fetch(`${BACKEND_URL}/api/test-groups/${editingGroup.id}`, {
@@ -58,8 +87,11 @@ const TestGroupManager = ({ testGroups, testCases, onGroupsUpdate }) => {
     setEditingGroup(group);
     setFormData({
       name: group.name,
-      sequence: group.sequence.join(', '),
-      within_seconds: group.within_seconds || ''
+      sequence: group.sequence,
+      selectedTest: '',
+      within_seconds: group.within_seconds || '',
+      on_pass_message: group.on_pass_message || 'Group {name} passed',
+      on_fail_message: group.on_fail_message || 'Group {name} failed'
     });
     setIsEditing(true);
   };
@@ -108,8 +140,36 @@ const TestGroupManager = ({ testGroups, testCases, onGroupsUpdate }) => {
                 <input type="text" name="name" value={formData.name} onChange={handleInputChange} className="form-input" required />
               </div>
               <div className="form-group">
-                <label className="form-label">Sequence (comma-separated test names)</label>
-                <input type="text" name="sequence" value={formData.sequence} onChange={handleInputChange} className="form-input" placeholder="Test A, Test B" />
+                <label className="form-label">Add Test to Sequence</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <select name="selectedTest" value={formData.selectedTest} onChange={handleInputChange} className="form-select" style={{ flex: 1 }}>
+                    <option value="">Select test...</option>
+                    {testCases.map(tc => (
+                      <option key={tc.id} value={tc.name}>{tc.name}</option>
+                    ))}
+                  </select>
+                  <button type="button" className="btn btn-small" onClick={handleAddTest}>ADD</button>
+                </div>
+                {formData.sequence.length > 0 && (
+                  <ul style={{ marginTop: '8px' }}>
+                    {formData.sequence.map((t, idx) => (
+                      <li key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>{idx + 1}. {t}</span>
+                        <button type="button" className="btn btn-small btn-danger" onClick={() => handleRemoveTest(idx)}>REMOVE</button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Pass Message</label>
+                <input type="text" name="on_pass_message" value={formData.on_pass_message} onChange={handleInputChange} className="form-input" />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Fail Message</label>
+                <input type="text" name="on_fail_message" value={formData.on_fail_message} onChange={handleInputChange} className="form-input" />
               </div>
               <div className="form-group">
                 <label className="form-label">Within Seconds (optional)</label>

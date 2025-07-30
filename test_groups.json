@@ -2,6 +2,8 @@
   {
     "id": "group-1",
     "name": "Basic Sequence",
-    "sequence": ["App Build Parameter Check", "API Version Validation", "User Agent Detection"]
+    "sequence": ["App Build Parameter Check", "API Version Validation", "User Agent Detection"],
+    "on_pass_message": "Basic Sequence completed successfully",
+    "on_fail_message": "Basic Sequence failed"
   }
 ]
