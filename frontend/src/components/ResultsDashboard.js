@@ -194,13 +194,15 @@ const ResultsDashboard = ({ report }) => {
                   <tr>
                     <th>GROUP</th>
                     <th>PASS</th>
+                    <th>MESSAGE</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(report.group_results).map(([name, passed]) => (
+                  {Object.entries(report.group_results).map(([name, data]) => (
                     <tr key={name}>
                       <td>{name}</td>
-                      <td>{passed ? 'YES' : 'NO'}</td>
+                      <td>{data.passed ? 'YES' : 'NO'}</td>
+                      <td>{data.message}</td>
                     </tr>
                   ))}
                 </tbody>

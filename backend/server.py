@@ -50,6 +50,8 @@ class TestGroup(BaseModel):
     name: str
     sequence: List[str]
     within_seconds: Optional[int] = None
+    on_pass_message: Optional[str] = "Group {name} passed"
+    on_fail_message: Optional[str] = "Group {name} failed"
 
 class AnalysisReport(BaseModel):
     total_requests: int
@@ -60,7 +62,7 @@ class AnalysisReport(BaseModel):
     dimension_failures: Dict[str, int]
     detailed_results: List[TestResult]
     raw_data: List[Dict[str, Any]]
-    group_results: Dict[str, bool]
+    group_results: Dict[str, Dict[str, Any]]
 
 class HarFile(BaseModel):
     filename: str
@@ -175,7 +177,9 @@ def load_test_groups_from_json(json_path='test_groups.json') -> List[TestGroup]:
                     id=group.get('id', str(uuid.uuid4())),
                     name=group.get('name', ''),
                     sequence=group.get('sequence', []),
-                    within_seconds=group.get('within_seconds')
+                    within_seconds=group.get('within_seconds'),
+                    on_pass_message=group.get('on_pass_message', 'Group {name} passed'),
+                    on_fail_message=group.get('on_fail_message', 'Group {name} failed')
                 ))
     except FileNotFoundError:
         print(f"Test group file {json_path} not found. Continuing without groups.")
@@ -338,8 +342,8 @@ def analyze_failures(calls: List[dict]) -> tuple:
     return url_failures, dimension_failures
 
 # Evaluate test groups based on call results
-def evaluate_test_groups(calls: List[dict], groups: List[TestGroup]) -> Dict[str, bool]:
-    results = {}
+def evaluate_test_groups(calls: List[dict], groups: List[TestGroup]) -> Dict[str, Dict[str, Any]]:
+    results: Dict[str, Dict[str, Any]] = {}
     # Map test names to list of indices when they passed
     test_pass_indices: Dict[str, List[int]] = {}
     for idx, call in enumerate(calls):
@@ -372,7 +376,9 @@ def evaluate_test_groups(calls: List[dict], groups: List[TestGroup]) -> Dict[str
                     except Exception:
                         pass
             current_index = next_index
-        results[group.name] = group_passed
+        message_template = group.on_pass_message if group_passed else group.on_fail_message
+        message = message_template.format(name=group.name)
+        results[group.name] = {"passed": group_passed, "message": message}
     return results
 
 # API Endpoints
@@ -521,7 +527,7 @@ async def analyze_har_file_by_name(filename: str):
         url_failures, dimension_failures = analyze_failures(calls)
         test_groups = load_test_groups_from_json('../test_groups.json')
         group_results = evaluate_test_groups(calls, test_groups)
-        
+
         # Create detailed results
         detailed_results = []
         for call in calls:
@@ -533,6 +539,26 @@ async def analyze_har_file_by_name(filename: str):
                     details=result,
                     test_case_name=test_name
                 ))
+
+        # Add group test results
+        for name, data in group_results.items():
+            detailed_results.append(TestResult(
+                url="[GROUP]",
+                parameter="",
+                result="Pass" if data.get("passed") else "Fail",
+                details=data.get("message", ""),
+                test_case_name=name
+            ))
+
+        # Add group test results
+        for name, data in group_results.items():
+            detailed_results.append(TestResult(
+                url="[GROUP]",
+                parameter="",
+                result="Pass" if data.get("passed") else "Fail",
+                details=data.get("message", ""),
+                test_case_name=name
+            ))
         
         # Create analysis report
         total_tests = len(detailed_results)
@@ -677,9 +703,10 @@ async def export_report(report_id: str):
     for param, count in report.dimension_failures.items():
         summary_data.append([param, count])
 
-    summary_data.extend([["", ""], ["Test Groups", "Passed"]])
-    for name, passed in report.group_results.items():
-        summary_data.append([name, "Yes" if passed else "No"]) 
+    summary_data.extend([["", ""], ["Test Groups", "Result"]])
+    for name, data in report.group_results.items():
+        status = "Pass" if data.get("passed") else "Fail"
+        summary_data.append([name, f"{status}: {data.get('message', '')}"])
     
     for row, data in enumerate(summary_data, 1):
         for col, value in enumerate(data, 1):
