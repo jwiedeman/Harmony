@@ -89,7 +89,7 @@ Target URLs: analytics.example.com
 ```
 
 ### Composite Test Group
-Create `test_groups.json` in the project root to define sequences of existing test cases.
+Create `test_groups.json` in the project root to define sequences of existing test cases. Groups can also be managed via the `/api/test-groups` endpoints and through the Test Groups screen in the web UI.
 Example:
 ```json
 [

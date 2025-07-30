@@ -261,7 +261,7 @@ Target URLs: debug.mysite.com
 ```
 
 ### Composite Test Groups
-Define sequences of test cases in `test_groups.json` to validate complex workflows.
+Define sequences of test cases in `test_groups.json` to validate complex workflows. The backend now exposes CRUD APIs under `/api/test-groups` so groups can be managed directly from the web UI.
 
 ---
 

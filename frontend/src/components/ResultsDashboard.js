@@ -182,6 +182,32 @@ const ResultsDashboard = ({ report }) => {
             )}
           </div>
         </div>
+
+        <div className="card">
+          <div className="card-header">TEST GROUP RESULTS</div>
+          <div className="card-body">
+            {Object.keys(report.group_results).length === 0 ? (
+              <p>NO GROUPS DEFINED</p>
+            ) : (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>GROUP</th>
+                    <th>PASS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(report.group_results).map(([name, passed]) => (
+                    <tr key={name}>
+                      <td>{name}</td>
+                      <td>{passed ? 'YES' : 'NO'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
