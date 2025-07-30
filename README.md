@@ -260,6 +260,9 @@ Optional: YES
 Target URLs: debug.mysite.com
 ```
 
+### Composite Test Groups
+Define sequences of test cases in `test_groups.json` to validate complex workflows.
+
 ---
 
 ## 🎨 Design Philosophy

@@ -13,6 +13,7 @@ The Harmony QA System is a comprehensive web-based tool for analyzing HTTP Archi
 - **URL Targeting**: Apply tests to specific domains or all requests
 - **Optional Parameters**: Mark parameters as optional to avoid false failures
 - **Custom Messages**: Define success/failure messages with placeholders
+- **Composite Test Groups**: Chain multiple tests together to validate complex sequences
 
 ### 📁 HAR File Analysis
 - **Drag & Drop Upload**: Easy file upload interface
@@ -85,6 +86,18 @@ Parameter: tracking_id
 Condition: EXISTS
 Optional: YES
 Target URLs: analytics.example.com
+```
+
+### Composite Test Group
+Create `test_groups.json` in the project root to define sequences of existing test cases.
+Example:
+```json
+[
+  {
+    "name": "Basic Sequence",
+    "sequence": ["App Build Parameter Check", "API Version Validation", "User Agent Detection"]
+  }
+]
 ```
 
 ## HAR File Collection
