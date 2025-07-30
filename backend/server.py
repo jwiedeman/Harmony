@@ -172,7 +172,7 @@ def load_test_groups_from_json(json_path='test_groups.json') -> List[TestGroup]:
             data = json.load(f)
             for group in data:
                 groups.append(TestGroup(
-                    id=str(uuid.uuid4()),
+                    id=group.get('id', str(uuid.uuid4())),
                     name=group.get('name', ''),
                     sequence=group.get('sequence', []),
                     within_seconds=group.get('within_seconds')
@@ -182,6 +182,22 @@ def load_test_groups_from_json(json_path='test_groups.json') -> List[TestGroup]:
     except Exception as e:
         print(f"Error loading test groups from {json_path}: {e}")
     return groups
+
+# Function to save test groups to JSON file
+def save_test_groups_to_json(groups: List[TestGroup], json_path='test_groups.json') -> bool:
+    try:
+        # Ensure path
+        if not os.path.exists(os.path.dirname(json_path)) and json_path != os.path.basename(json_path):
+            parent_path = os.path.join("../", os.path.basename(json_path))
+            json_path = parent_path
+
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump([g.dict() for g in groups], f, indent=2)
+        print(f"Saved {len(groups)} test groups to {json_path}")
+        return True
+    except Exception as e:
+        print(f"Error saving test groups to {json_path}: {e}")
+        return False
 
 # Function to get available HAR files
 def get_available_har_files():
@@ -422,6 +438,52 @@ async def delete_test_case(test_case_id: str):
         return {"message": "Test case deleted successfully"}
     else:
         raise HTTPException(status_code=500, detail="Failed to delete test case")
+
+# Test Group Endpoints
+@app.get("/api/test-groups")
+async def get_test_groups():
+    groups = load_test_groups_from_json('../test_groups.json')
+    return {"test_groups": [g.dict() for g in groups]}
+
+
+@app.post("/api/test-groups")
+async def create_test_group(group: TestGroup):
+    groups = load_test_groups_from_json('../test_groups.json')
+    if not group.id:
+        group.id = str(uuid.uuid4())
+    groups.append(group)
+    if save_test_groups_to_json(groups, '../test_groups.json'):
+        return {"message": "Test group created successfully", "id": group.id}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to save test group")
+
+
+@app.put("/api/test-groups/{group_id}")
+async def update_test_group(group_id: str, group: TestGroup):
+    groups = load_test_groups_from_json('../test_groups.json')
+    updated = False
+    for i, g in enumerate(groups):
+        if g.id == group_id:
+            group.id = group_id
+            groups[i] = group
+            updated = True
+            break
+    if not updated:
+        raise HTTPException(status_code=404, detail="Test group not found")
+    if save_test_groups_to_json(groups, '../test_groups.json'):
+        return {"message": "Test group updated successfully"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to update test group")
+
+
+@app.delete("/api/test-groups/{group_id}")
+async def delete_test_group(group_id: str):
+    groups = load_test_groups_from_json('../test_groups.json')
+    groups = [g for g in groups if g.id != group_id]
+    if save_test_groups_to_json(groups, '../test_groups.json'):
+        return {"message": "Test group deleted successfully"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to delete test group")
 
 @app.get("/api/har-files")
 async def get_har_files():
