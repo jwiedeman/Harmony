@@ -45,6 +45,12 @@ class TestResult(BaseModel):
     details: str
     test_case_name: str
 
+class TestGroup(BaseModel):
+    id: str
+    name: str
+    sequence: List[str]
+    within_seconds: Optional[int] = None
+
 class AnalysisReport(BaseModel):
     total_requests: int
     total_tests: int
@@ -54,6 +60,7 @@ class AnalysisReport(BaseModel):
     dimension_failures: Dict[str, int]
     detailed_results: List[TestResult]
     raw_data: List[Dict[str, Any]]
+    group_results: Dict[str, bool]
 
 class HarFile(BaseModel):
     filename: str
@@ -152,6 +159,29 @@ def save_tests_to_xlsx(test_cases: List[TestCase], xlsx_path='test_cases.xlsx'):
     except Exception as e:
         print(f"Error saving test cases to {xlsx_path}: {e}")
         return False
+
+# Function to load test groups from JSON file
+def load_test_groups_from_json(json_path='test_groups.json') -> List[TestGroup]:
+    groups = []
+    try:
+        if not os.path.exists(json_path):
+            parent_path = os.path.join("../", os.path.basename(json_path))
+            if os.path.exists(parent_path):
+                json_path = parent_path
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            for group in data:
+                groups.append(TestGroup(
+                    id=str(uuid.uuid4()),
+                    name=group.get('name', ''),
+                    sequence=group.get('sequence', []),
+                    within_seconds=group.get('within_seconds')
+                ))
+    except FileNotFoundError:
+        print(f"Test group file {json_path} not found. Continuing without groups.")
+    except Exception as e:
+        print(f"Error loading test groups from {json_path}: {e}")
+    return groups
 
 # Function to get available HAR files
 def get_available_har_files():
@@ -269,7 +299,8 @@ def parse_har_for_calls(har_data: dict, test_cases: List[TestCase]) -> List[dict
             "method": entry['request']['method'],
             "parameters": parameters,
             "payload": post_data.get("text", "No payload"),
-            "status": entry['response']['status']
+            "status": entry['response']['status'],
+            "startedDateTime": entry.get('startedDateTime')
         }
         
         results = apply_test_cases(call, test_cases)
@@ -289,6 +320,44 @@ def analyze_failures(calls: List[dict]) -> tuple:
                 dimension_failures[param_name] = dimension_failures.get(param_name, 0) + 1
     
     return url_failures, dimension_failures
+
+# Evaluate test groups based on call results
+def evaluate_test_groups(calls: List[dict], groups: List[TestGroup]) -> Dict[str, bool]:
+    results = {}
+    # Map test names to list of indices when they passed
+    test_pass_indices: Dict[str, List[int]] = {}
+    for idx, call in enumerate(calls):
+        for result, _, test_name in call.get("results", []):
+            if "Pass" in result:
+                test_pass_indices.setdefault(test_name, []).append(idx)
+
+    for group in groups:
+        current_index = -1
+        group_passed = True
+        first_time = None
+        for test_name in group.sequence:
+            indices = test_pass_indices.get(test_name, [])
+            next_index = next((i for i in indices if i > current_index), None)
+            if next_index is None:
+                group_passed = False
+                break
+            if first_time is None:
+                first_time = calls[next_index].get("startedDateTime")
+            elif group.within_seconds is not None and first_time is not None:
+                this_time = calls[next_index].get("startedDateTime")
+                if this_time and first_time:
+                    try:
+                        from datetime import datetime
+                        t1 = datetime.fromisoformat(first_time)
+                        t2 = datetime.fromisoformat(this_time)
+                        if (t2 - t1).total_seconds() > group.within_seconds:
+                            group_passed = False
+                            break
+                    except Exception:
+                        pass
+            current_index = next_index
+        results[group.name] = group_passed
+    return results
 
 # API Endpoints
 @app.get("/api/health")
@@ -388,6 +457,8 @@ async def analyze_har_file_by_name(filename: str):
         # Analyze the HAR file
         calls = parse_har_for_calls(har_data, test_cases)
         url_failures, dimension_failures = analyze_failures(calls)
+        test_groups = load_test_groups_from_json('../test_groups.json')
+        group_results = evaluate_test_groups(calls, test_groups)
         
         # Create detailed results
         detailed_results = []
@@ -414,7 +485,8 @@ async def analyze_har_file_by_name(filename: str):
             url_failures=url_failures,
             dimension_failures=dimension_failures,
             detailed_results=detailed_results,
-            raw_data=calls
+            raw_data=calls,
+            group_results=group_results
         )
         
         # Store results
@@ -446,6 +518,8 @@ async def analyze_har(file: UploadFile = File(...)):
         # Analyze the HAR file
         calls = parse_har_for_calls(har_data, test_cases)
         url_failures, dimension_failures = analyze_failures(calls)
+        test_groups = load_test_groups_from_json("../test_groups.json")
+        group_results = evaluate_test_groups(calls, test_groups)
         
         # Create detailed results
         detailed_results = []
@@ -472,7 +546,8 @@ async def analyze_har(file: UploadFile = File(...)):
             url_failures=url_failures,
             dimension_failures=dimension_failures,
             detailed_results=detailed_results,
-            raw_data=calls
+            raw_data=calls,
+            group_results=group_results
         )
         
         # Store results
@@ -539,6 +614,10 @@ async def export_report(report_id: str):
     summary_data.extend([["", ""], ["Parameter Failures", "Count"]])
     for param, count in report.dimension_failures.items():
         summary_data.append([param, count])
+
+    summary_data.extend([["", ""], ["Test Groups", "Passed"]])
+    for name, passed in report.group_results.items():
+        summary_data.append([name, "Yes" if passed else "No"]) 
     
     for row, data in enumerate(summary_data, 1):
         for col, value in enumerate(data, 1):

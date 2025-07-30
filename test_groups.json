@@ -1,0 +1,6 @@
+[
+  {
+    "name": "Basic Sequence",
+    "sequence": ["App Build Parameter Check", "API Version Validation", "User Agent Detection"]
+  }
+]
