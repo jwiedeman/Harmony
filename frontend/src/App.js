@@ -6,6 +6,7 @@ import HarAnalyzer from './components/HarAnalyzer';
 import ResultsDashboard from './components/ResultsDashboard';
 import { FileText, Upload, BarChart3, Settings, Layers } from 'lucide-react';
 import { BACKEND_URL } from './config';
+import { Feature16 } from './components/Feature16';
 
 const App = () => {
   const [activeTab, setActiveTab] = useState('test-cases');
@@ -102,6 +103,7 @@ const App = () => {
       </nav>
 
       <main className="app-main">
+        <Feature16 />
         <div className="main-content">
           {renderContent()}
         </div>
