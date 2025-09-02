@@ -33,6 +33,7 @@ def test_analyze_session_combines_metrics_and_violations():
     assert result["metrics"]["pause"] == 0.0
     assert result["metrics"]["buffer"] == 0.0
     assert result["metrics"]["total"] == pytest.approx(25.0, rel=1e-3)
+    assert result["metrics"]["ping_integrity"] < 100.0
 
     # Violations from ordering and timing components are surfaced
     ordering = " ".join(result["violations"]["ordering"])
