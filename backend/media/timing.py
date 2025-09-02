@@ -92,4 +92,76 @@ def validate_ping_cadence(
     return violations
 
 
-__all__ = ["validate_ping_cadence"]
+def compute_ping_integrity(
+    events: Iterable[MediaEvent],
+    main_cadence: float = 10.0,
+    ad_cadence: float = 1.0,
+    tolerance: float = 2.0,
+) -> float:
+    """Return the percentage of expected pings that occurred within tolerance.
+
+    The function mirrors :func:`validate_ping_cadence` but instead of
+    returning human readable violation messages it calculates a score in the
+    range ``0`` – ``100``.  A score of ``100`` means every expected ping was
+    observed within the configured tolerance while ``0`` indicates that none of
+    the expected pings arrived on time.
+    """
+
+    cad_main_ms = int(main_cadence * 1000)
+    cad_ad_ms = int(ad_cadence * 1000)
+    tol_ms = int(tolerance * 1000)
+
+    current_asset: str | None = None
+    cadence_ms: int | None = None
+    expected_ts: int | None = None
+    expected = 0
+    observed = 0
+
+    for event in sorted(events, key=lambda e: e.tsDevice):
+        t = event.type
+        asset = event.assetType or event.params.get("s:asset:type")
+
+        if t in {"play", "adStart"}:
+            current_asset = "ad" if (asset == "ad" or t == "adStart") else "main"
+            cadence_ms = cad_ad_ms if current_asset == "ad" else cad_main_ms
+            expected_ts = event.tsDevice + cadence_ms
+            continue
+
+        if t == "ping" and current_asset is not None:
+            if expected_ts is not None and cadence_ms is not None:
+                # Account for any completely missing pings before this one.
+                while event.tsDevice - expected_ts > tol_ms:
+                    expected += 1
+                    expected_ts += cadence_ms
+
+                expected += 1
+                if abs(event.tsDevice - expected_ts) <= tol_ms:
+                    observed += 1
+                expected_ts = event.tsDevice + cadence_ms
+            continue
+
+        if t in {
+            "pauseStart",
+            "bufferStart",
+            "adBreakStart",
+            "adBreakComplete",
+            "adComplete",
+            "sessionEnd",
+            "sessionComplete",
+        }:
+            if expected_ts is not None and cadence_ms is not None:
+                while event.tsDevice - expected_ts > tol_ms:
+                    expected += 1
+                    expected_ts += cadence_ms
+            current_asset = None
+            cadence_ms = None
+            expected_ts = None
+            continue
+        # Other events are ignored.
+
+    if expected == 0:
+        return 100.0
+    return observed / expected * 100.0
+
+
+__all__ = ["validate_ping_cadence", "compute_ping_integrity"]

@@ -20,7 +20,7 @@ from typing import Iterable, Dict, Any
 from .models import MediaEvent
 from .normalize import network_events_to_media_events
 from .state_machine import validate_event_order
-from .timing import validate_ping_cadence
+from .timing import validate_ping_cadence, compute_ping_integrity
 from .metrics import compute_basic_metrics
 from .params import validate_param_rules
 
@@ -65,6 +65,7 @@ def analyze_session(
         rules = [r if isinstance(r, ParamRule) else ParamRule(**r) for r in param_rules]
         violations["params"] = validate_param_rules(ordered, rules)
     metrics = compute_basic_metrics(ordered)
+    metrics["ping_integrity"] = compute_ping_integrity(ordered)
     return {"metrics": metrics, "violations": violations}
 
 
