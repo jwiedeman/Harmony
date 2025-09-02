@@ -22,9 +22,13 @@ from .normalize import network_events_to_media_events
 from .state_machine import validate_event_order
 from .timing import validate_ping_cadence
 from .metrics import compute_basic_metrics
+from .params import validate_param_rules
 
 
-def analyze_session(events: Iterable[MediaEvent]) -> Dict[str, Any]:
+def analyze_session(
+    events: Iterable[MediaEvent],
+    param_rules: Iterable["ParamRule"] | None = None,
+) -> Dict[str, Any]:
     """Analyze a sequence of :class:`MediaEvent` objects.
 
     Parameters
@@ -44,19 +48,30 @@ def analyze_session(events: Iterable[MediaEvent]) -> Dict[str, Any]:
             :func:`compute_basic_metrics`.
         ``violations``
             Dictionary containing lists of human readable violation messages
-            under ``ordering`` and ``timing``.
+            under ``ordering``, ``timing`` and, when ``param_rules`` are
+            supplied, ``params``.
     """
+
+    from ..scenarios.schema import ParamRule  # local import to avoid cycle
 
     ordered = sorted(events, key=lambda e: e.tsDevice)
     violations = {
         "ordering": validate_event_order(ordered),
         "timing": validate_ping_cadence(ordered),
+        "params": [],
     }
+    if param_rules:
+        # Coerce to ParamRule instances in case plain dictionaries were passed
+        rules = [r if isinstance(r, ParamRule) else ParamRule(**r) for r in param_rules]
+        violations["params"] = validate_param_rules(ordered, rules)
     metrics = compute_basic_metrics(ordered)
     return {"metrics": metrics, "violations": violations}
 
 
-def analyze_network_log(events: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+def analyze_network_log(
+    events: Iterable[Dict[str, Any]],
+    param_rules: Iterable["ParamRule"] | None = None,
+) -> Dict[str, Any]:
     """Analyze a raw network log represented as dictionaries.
 
     This helper first normalizes the network entries using
@@ -65,7 +80,7 @@ def analyze_network_log(events: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
     """
 
     media_events = network_events_to_media_events(events)
-    return analyze_session(media_events)
+    return analyze_session(media_events, param_rules=param_rules)
 
 
 __all__ = ["analyze_session", "analyze_network_log"]
