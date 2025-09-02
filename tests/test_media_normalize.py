@@ -44,3 +44,33 @@ def test_network_events_to_media_events():
     assert me.playhead == 12.34
     assert me.streamType == "vod"
     assert me.assetType == "main"
+
+
+def test_network_events_to_media_events_camel_case_fields():
+    """Events using camelCase field names are normalized."""
+    log = [
+        {
+            "bodyJSON": {
+                "events": [
+                    {
+                        "eventType": "play",
+                        "sessionId": "xyz",
+                        "ts": 1000,
+                        "playhead": 5.0,
+                        "streamType": "vod",
+                        "assetType": "main",
+                    }
+                ]
+            },
+            "queryParams": {},
+        }
+    ]
+    media_events = network_events_to_media_events(log)
+    assert len(media_events) == 1
+    me = media_events[0]
+    assert me.sessionId == "xyz"
+    assert me.type == "play"
+    assert me.tsDevice == 1000
+    assert me.playhead == 5.0
+    assert me.streamType == "vod"
+    assert me.assetType == "main"
