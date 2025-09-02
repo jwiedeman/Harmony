@@ -58,20 +58,40 @@ def network_events_to_media_events(events: Iterable[Dict[str, Any]]) -> List[Med
                 params.update(query)
                 params.update({k: v for k, v in item.items() if k != "params"})
 
-            event_type = params.get("s:event:type")
+            # Adobe's Media Collection API uses both the legacy ``s:*`` style
+            # parameter names and a newer camelCase variant (eventType,
+            # sessionId, playhead, ts, assetType, streamType, ...).  Older
+            # heartbeat endpoints generally only use the ``s:*`` names.  To be
+            # forgiving we accept either representation by checking multiple
+            # possible keys for each attribute.
+
+            event_type = (
+                params.get("s:event:type")
+                or params.get("eventType")
+                or params.get("type")
+            )
             session_id = (
                 params.get("s:event:sid")
                 or params.get("s:session:id")
                 or params.get("sessionId")
+                or params.get("sid")
             )
             if not event_type or not session_id:
                 # Not an Adobe media event
                 continue
 
-            ts_device = _coerce_int(params.get("l:event:ts"))
-            playhead = _coerce_float(params.get("l:event:playhead"))
-            stream_type = params.get("s:stream:type")
-            asset_type = params.get("s:asset:type")
+            ts_device = _coerce_int(
+                params.get("l:event:ts") or params.get("ts")
+            )
+            playhead = _coerce_float(
+                params.get("l:event:playhead") or params.get("playhead")
+            )
+            stream_type = (
+                params.get("s:stream:type") or params.get("streamType")
+            )
+            asset_type = (
+                params.get("s:asset:type") or params.get("assetType")
+            )
 
             media_events.append(
                 MediaEvent(
