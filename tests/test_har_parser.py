@@ -35,3 +35,22 @@ def test_parse_har_basic():
     assert ev["url"] == "https://example.com/v1/events"
     assert ev["queryParams"]["s:event:type"] == "play"
     assert ev["bodyJSON"] == {"foo": "bar"}
+
+
+def test_parse_har_query_from_url():
+    sample = {
+        "log": {
+            "entries": [
+                {
+                    "startedDateTime": "2023-01-01T00:00:00Z",
+                    "request": {
+                        "url": "https://example.com/v1/events?alpha=1&beta=two",
+                        "method": "GET",
+                    },
+                    "response": {"status": 200, "headers": []},
+                }
+            ]
+        }
+    }
+    events = parse_har(io.StringIO(json.dumps(sample)))
+    assert events[0]["queryParams"] == {"alpha": "1", "beta": "two"}

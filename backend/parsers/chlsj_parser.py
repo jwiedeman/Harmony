@@ -1,5 +1,6 @@
 import json
 from typing import List, Dict, Any, IO
+from urllib.parse import urlparse, parse_qsl
 
 
 def parse_chlsj(file_obj: IO) -> List[Dict[str, Any]]:
@@ -28,13 +29,27 @@ def parse_chlsj(file_obj: IO) -> List[Dict[str, Any]]:
             "method": request.get("method"),
             "status": response.get("status"),
             "startedDateTime": entry.get("startedDateTime"),
-            "requestHeaders": {h.get("name"): h.get("value") for h in request.get("headers", [])},
-            "responseHeaders": {h.get("name"): h.get("value") for h in response.get("headers", [])},
+            "requestHeaders": {
+                h.get("name"): h.get("value") for h in request.get("headers", [])
+            },
+            "responseHeaders": {
+                h.get("name"): h.get("value") for h in response.get("headers", [])
+            },
             "postData": request.get("postData"),
-            "queryParams": {p.get("name"): p.get("value") for p in request.get("queryString", [])},
+            "queryParams": {
+                p.get("name"): p.get("value") for p in request.get("queryString", [])
+            },
             "bodyJSON": None,
             "raw": entry,
         }
+
+        # Some Charles exports omit the ``queryString`` array when the request
+        # URL already contains encoded parameters.  In those cases fall back to
+        # parsing the query portion of the URL so downstream normalization sees
+        # a consistent ``queryParams`` mapping.
+        if not event["queryParams"] and isinstance(event["url"], str):
+            parsed = urlparse(event["url"])
+            event["queryParams"] = dict(parse_qsl(parsed.query))
         post = event.get("postData") or {}
         text = post.get("text")
         if isinstance(text, str):
