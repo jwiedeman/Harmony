@@ -14,7 +14,7 @@ import shutil
 import glob
 from openpyxl import load_workbook
 
-from .parsers.chlsj_parser import parse_chlsj
+from .parsers import parse_network_file
 import io
 
 app = FastAPI(title="Harmony QA API", description="QA Testing API for HAR file analysis")
@@ -29,40 +29,6 @@ app.add_middleware(
 )
 
 
-def parse_har(file_obj: io.TextIOBase):
-    """Convert a HAR file object into a list of network events.
-
-    The schema matches the output of :func:`parse_chlsj` so the frontend can
-    treat both sources uniformly.  Only a subset of fields is extracted.
-    """
-    data = json.load(file_obj)
-    entries = data.get("log", {}).get("entries", [])
-    events = []
-    for entry in entries:
-        request = entry.get("request", {})
-        response = entry.get("response", {})
-        event = {
-            "url": request.get("url"),
-            "method": request.get("method"),
-            "status": response.get("status"),
-            "startedDateTime": entry.get("startedDateTime"),
-            "requestHeaders": {h.get("name"): h.get("value") for h in request.get("headers", [])},
-            "responseHeaders": {h.get("name"): h.get("value") for h in response.get("headers", [])},
-            "postData": request.get("postData"),
-            "queryParams": {p.get("name"): p.get("value") for p in request.get("queryString", [])},
-            "bodyJSON": None,
-            "raw": entry,
-        }
-        post = event.get("postData") or {}
-        text = post.get("text")
-        if isinstance(text, str):
-            try:
-                event["bodyJSON"] = json.loads(text)
-            except json.JSONDecodeError:
-                pass
-        events.append(event)
-    return events
-
 
 @app.post("/api/ingest")
 async def ingest(file: UploadFile = File(...)):
@@ -71,7 +37,6 @@ async def ingest(file: UploadFile = File(...)):
     The response is a simple list of normalized network events that can be
     further processed by Harmony.  This endpoint is intentionally lightweight
     and does not perform any Adobe-specific validation."""
-    ext = os.path.splitext(file.filename)[1].lower()
     contents = await file.read()
     try:
         text = contents.decode("utf-8")
@@ -79,12 +44,10 @@ async def ingest(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Unable to decode upload as UTF-8")
 
     with io.StringIO(text) as f:
-        if ext == ".chlsj":
-            events = parse_chlsj(f)
-        elif ext == ".har":
-            events = parse_har(f)
-        else:
-            raise HTTPException(status_code=400, detail="Unsupported file type")
+        try:
+            events = parse_network_file(f, file.filename)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
     return {"events": events}
 
 # Pydantic models
