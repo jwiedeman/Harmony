@@ -36,3 +36,15 @@ def test_parse_network_file_chlsj():
     events = parse_network_file(io.StringIO(json.dumps(sample)), "file.chlsj")
     assert len(events) == 1
     assert events[0]["url"] == "https://example.com/v1/events"
+
+
+def test_parse_network_file_chls_no_charles(tmp_path):
+    path = tmp_path / "file.chls"
+    path.write_bytes(b"not-a-real-chls")
+    with open(path, "rb") as f:
+        try:
+            parse_network_file(f, str(path))
+        except RuntimeError as e:
+            assert "Charles CLI" in str(e)
+        else:
+            raise AssertionError("RuntimeError expected when Charles CLI missing")
