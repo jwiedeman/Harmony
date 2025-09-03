@@ -16,6 +16,37 @@ from typing import Dict, Optional
 from urllib.parse import urlparse
 
 
+def _detect_platform(event: Dict[str, object]) -> Optional[str]:
+    """Best-effort platform inference from request headers.
+
+    The heuristics are intentionally simple and rely primarily on the
+    ``User-Agent`` header.  The goal is to provide a coarse indicator of the
+    client environment (web, ios, android, tvos, fire_tv, roku) so later
+    processing stages can apply profile specific logic.
+    """
+
+    headers = event.get("requestHeaders") or {}
+    ua = headers.get("User-Agent") or headers.get("user-agent") or ""
+    ua = ua.lower()
+    if not ua:
+        return None
+
+    # Order matters: check more specific platforms before generic matches.
+    if "roku" in ua:
+        return "roku"
+    if "firetv" in ua or "aft" in ua:
+        return "fire_tv"
+    if "tvos" in ua or "appletv" in ua or "apple tv" in ua:
+        return "tvos"
+    if "iphone" in ua or "ipad" in ua or "ipod" in ua:
+        return "ios"
+    if "android" in ua:
+        return "android"
+    if "windows" in ua or "macintosh" in ua or "linux" in ua or "mozilla" in ua:
+        return "web"
+    return None
+
+
 def fingerprint_event(event: Dict[str, object]) -> Dict[str, Optional[str]]:
     """Return analytics metadata for a single network ``event``.
 
@@ -40,6 +71,7 @@ def fingerprint_event(event: Dict[str, object]) -> Dict[str, Optional[str]]:
     vendor: Optional[str] = None
     transport: Optional[str] = None
     profile: Optional[str] = None
+    platform: Optional[str] = _detect_platform(event)
 
     # --- Adobe Analytics and Media ---
     if host.endswith("hb-api.omtrdc.net") or host.endswith("hb.omtrdc.net"):
@@ -61,7 +93,12 @@ def fingerprint_event(event: Dict[str, object]) -> Dict[str, Optional[str]]:
         transport = "measurement"
         profile = "web"
 
-    return {"vendor": vendor, "transport": transport, "profile": profile}
+    return {
+        "vendor": vendor,
+        "transport": transport,
+        "profile": profile,
+        "platform": platform,
+    }
 
 
 __all__ = ["fingerprint_event"]

@@ -26,6 +26,7 @@ def test_unified_request_fingerprint_and_parts():
     assert req.vendor == "adobe"
     assert req.transport == "edge"
     assert req.profile == "web"
+    assert req.platform is None
     assert req.source["file"] == "test.har"
 
 
@@ -35,3 +36,13 @@ def test_unified_request_unknown_vendor():
     assert req.vendor is None
     assert req.transport is None
     assert req.profile is None
+    assert req.platform is None
+
+
+def test_unified_request_with_platform():
+    event = make_event("https://example.adobedc.net/ee/v1/collect?x=1")
+    event["requestHeaders"] = {
+        "User-Agent": "Mozilla/5.0 (Linux; Android 11; Pixel 5)"
+    }
+    req = to_unified_requests([event])[0]
+    assert req.platform == "android"
