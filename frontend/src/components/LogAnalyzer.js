@@ -149,7 +149,7 @@ const LogAnalyzer = ({ onAnalysisComplete }) => {
           </div>
           <div className="card-body">
             <div
-              className="har-files-grid"
+              className="log-files-grid"
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
@@ -160,7 +160,7 @@ const LogAnalyzer = ({ onAnalysisComplete }) => {
               {availableLogFiles.map((logFile, index) => (
                 <div
                   key={index}
-                  className={`har-file-card ${
+                  className={`log-file-card ${
                     selectedLogFile?.filename === logFile.filename ? 'selected' : ''
                   }`}
                   style={{

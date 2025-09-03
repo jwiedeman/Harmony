@@ -26,7 +26,7 @@ const ResultsDashboard = ({ report }) => {
           <div className="card-body text-center">
             <AlertCircle size={48} style={{ margin: '20px 0' }} />
             <h3>NO ANALYSIS DATA AVAILABLE</h3>
-            <p>UPLOAD AND ANALYZE A HAR FILE TO VIEW RESULTS</p>
+            <p>UPLOAD AND ANALYZE A NETWORK LOG TO VIEW RESULTS</p>
           </div>
         </div>
       </div>
