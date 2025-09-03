@@ -72,10 +72,14 @@ def validate_event_order(events: Iterable[MediaEvent]) -> List[str]:
             continue
 
         if t == "pauseStart":
+            if state == _PlaybackState.PAUSED:
+                violations.append("pauseStart while already paused")
             state = _PlaybackState.PAUSED
             continue
 
         if t == "bufferStart":
+            if state == _PlaybackState.BUFFERING:
+                violations.append("bufferStart while already buffering")
             state = _PlaybackState.BUFFERING
             continue
 
@@ -125,6 +129,10 @@ def validate_event_order(events: Iterable[MediaEvent]) -> List[str]:
             if ad_break_active:
                 violations.append("session ended during active ad break")
                 ad_break_active = False
+            if state == _PlaybackState.PAUSED:
+                violations.append("session ended during pause")
+            if state == _PlaybackState.BUFFERING:
+                violations.append("session ended during buffer")
             state = _PlaybackState.IDLE
             continue
 
@@ -134,6 +142,10 @@ def validate_event_order(events: Iterable[MediaEvent]) -> List[str]:
         violations.append("ad not closed with adComplete")
     if ad_break_active:
         violations.append("ad break not closed with adBreakComplete")
+    if state == _PlaybackState.PAUSED:
+        violations.append("pause not closed with play")
+    if state == _PlaybackState.BUFFERING:
+        violations.append("buffer not closed with play")
 
     return violations
 
