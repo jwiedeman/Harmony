@@ -32,6 +32,7 @@ class UnifiedRequest(BaseModel):
     vendor: Optional[str] = Field(None, description="Detected analytics vendor")
     transport: Optional[str] = Field(None, description="Detected transport mechanism")
     profile: Optional[str] = Field(None, description="Detected profile/platform")
+    platform: Optional[str] = Field(None, description="Detected client platform")
     source: Dict[str, Any] = Field(default_factory=dict, description="Origin of the request")
 
 
@@ -57,6 +58,7 @@ def to_unified_requests(events: List[Dict[str, Any]]) -> List[UnifiedRequest]:
                 vendor=meta.get("vendor"),
                 transport=meta.get("transport"),
                 profile=meta.get("profile"),
+                platform=meta.get("platform"),
                 source=event.get("source") or {},
             )
         )
