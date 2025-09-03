@@ -15,6 +15,8 @@ import glob
 from openpyxl import load_workbook
 
 from .parsers import parse_network_file
+from .media import analyze_network_log_sessions
+from .adobe import extract_rsid
 import io
 
 app = FastAPI(title="Harmony QA API", description="QA Testing API for HAR file analysis")
@@ -89,7 +91,7 @@ class AnalysisReport(BaseModel):
     raw_data: List[Dict[str, Any]]
     group_results: Dict[str, Dict[str, Any]]
 
-class HarFile(BaseModel):
+class LogFile(BaseModel):
     filename: str
     path: str
     size: int
@@ -229,50 +231,56 @@ def save_test_groups_to_json(groups: List[TestGroup], json_path='test_groups.jso
         return False
 
 # Function to get available HAR files
-def get_available_har_files():
-    """Get list of available HAR files in the project directory."""
-    har_files = []
-    
-    # Look for HAR files in parent directory (project root) and common subdirectories  
+def get_available_log_files():
+    """Return list of available network log files."""
+    log_files = []
+
     base_paths = [
-        "../",  # Project root
-        "../data/", 
+        "../",
+        "../data/",
         "../samples/",
         "../test_data/",
-        "./",  # Current directory
+        "./",
         "data/",
-        "samples/", 
-        "test_data/"
+        "samples/",
+        "test_data/",
     ]
-    
+    extensions = ["*.har", "*.chls", "*.chlsj"]
+
     for base_path in base_paths:
         try:
-            search_pattern = os.path.join(base_path, "*.har")
-            for file_path in glob.glob(search_pattern):
-                try:
-                    stat = os.stat(file_path)
-                    # Get relative path from project root
-                    rel_path = os.path.relpath(file_path, "../")
-                    har_files.append(HarFile(
-                        filename=os.path.basename(file_path),
-                        path=rel_path,
-                        size=stat.st_size,
-                        modified=str(stat.st_mtime)
-                    ))
-                except OSError:
-                    continue
-        except:
+            for pattern in extensions:
+                search_pattern = os.path.join(base_path, pattern)
+                for file_path in glob.glob(search_pattern):
+                    try:
+                        stat = os.stat(file_path)
+                        rel_path = os.path.relpath(file_path, "../")
+                        log_files.append(
+                            LogFile(
+                                filename=os.path.basename(file_path),
+                                path=rel_path,
+                                size=stat.st_size,
+                                modified=str(stat.st_mtime),
+                            )
+                        )
+                    except OSError:
+                        continue
+        except Exception:
             continue
-    
-    # Remove duplicates based on filename
-    seen_files = set()
-    unique_har_files = []
-    for har_file in har_files:
-        if har_file.filename not in seen_files:
-            unique_har_files.append(har_file)
-            seen_files.add(har_file.filename)
-    
-    return unique_har_files
+
+    seen = set()
+    unique_files = []
+    for lf in log_files:
+        if lf.filename not in seen:
+            unique_files.append(lf)
+            seen.add(lf.filename)
+
+    return unique_files
+
+
+# Backwards compatibility alias
+def get_available_har_files():  # pragma: no cover - deprecated
+    return [lf for lf in get_available_log_files() if lf.filename.lower().endswith('.har')]
 
 # Helper functions (ported from original helper_functions.py)
 def extract_parameters(url: str, post_data_params: dict) -> dict:
@@ -516,44 +524,90 @@ async def delete_test_group(group_id: str):
     else:
         raise HTTPException(status_code=500, detail="Failed to delete test group")
 
-@app.get("/api/har-files")
-async def get_har_files():
-    har_files = get_available_har_files()
-    return {"har_files": [hf.dict() for hf in har_files]}
+@app.get("/api/log-files")
+async def get_log_files():
+    log_files = get_available_log_files()
+    return {"log_files": [lf.dict() for lf in log_files]}
+
+
+@app.get("/api/har-files")  # legacy alias
+async def get_har_files():  # pragma: no cover - legacy
+    log_files = get_available_log_files()
+    return {"har_files": [lf.dict() for lf in log_files]}
+
+
+def _analyze_events(events: List[Dict[str, Any]]):
+    sessions = analyze_network_log_sessions(events)
+    rsid_summary: Dict[str, int] = {}
+    for ev in events:
+        rsids = extract_rsid(ev)
+        if rsids:
+            key = ", ".join(rsids)
+            rsid_summary[key] = rsid_summary.get(key, 0) + 1
+        else:
+            rsid_summary["missing"] = rsid_summary.get("missing", 0) + 1
+    report = {"sessions": sessions, "rsid_summary": rsid_summary}
+    report_id = str(uuid.uuid4())
+    analysis_results_store[report_id] = report
+    return report_id, report
+
+
+@app.post("/api/analyze-log-file/{filename}")
+async def analyze_log_file_by_name(filename: str):
+    try:
+        log_files = get_available_log_files()
+        log_file = next((lf for lf in log_files if lf.filename == filename), None)
+        if not log_file:
+            raise HTTPException(status_code=404, detail=f"Log file '{filename}' not found")
+        full_path = log_file.path if log_file.path.startswith("../") else os.path.join("../", log_file.path)
+        with open(full_path, "rb") as f:
+            events = parse_network_file(f, filename)
+        report_id, report = _analyze_events(events)
+        return {"report_id": report_id, "report": report}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+
+@app.post("/api/analyze-media")
+async def analyze_media(file: UploadFile = File(...)):
+    contents = await file.read()
+    with io.BytesIO(contents) as buf:
+        try:
+            events = parse_network_file(buf, file.filename)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+    report_id, report = _analyze_events(events)
+    return {"report_id": report_id, "report": report}
+
+
+# --- Legacy HAR analysis endpoints (test case based) ---
 
 @app.post("/api/analyze-har-file/{filename}")
 async def analyze_har_file_by_name(filename: str):
     """Analyze a HAR file that exists in the project directory."""
     try:
-        # Find the HAR file
         har_files = get_available_har_files()
         har_file = next((hf for hf in har_files if hf.filename == filename), None)
-        
+
         if not har_file:
             raise HTTPException(status_code=404, detail=f"HAR file '{filename}' not found")
-        
-        # Construct full path - check if it's already a relative path from project root
-        if har_file.path.startswith('../'):
-            full_path = har_file.path
-        else:
-            full_path = os.path.join("../", har_file.path)
-        
-        # Read and parse HAR file
+
+        full_path = har_file.path if har_file.path.startswith('../') else os.path.join("../", har_file.path)
+
         with open(full_path, 'r', encoding='utf-8') as f:
             har_data = json.load(f)
-        
-        # Get test cases from Excel
+
         test_cases = load_tests_from_xlsx('../test_cases.xlsx')
         if not test_cases:
             raise HTTPException(status_code=400, detail="No test cases found in test_cases.xlsx. Please create test cases first.")
-        
-        # Analyze the HAR file
+
         calls = parse_har_for_calls(har_data, test_cases)
         url_failures, dimension_failures = analyze_failures(calls)
         test_groups = load_test_groups_from_json('../test_groups.json')
         group_results = evaluate_test_groups(calls, test_groups)
 
-        # Create detailed results
         detailed_results = []
         for call in calls:
             for result, param_name, test_name in call.get("results", []):
@@ -565,7 +619,6 @@ async def analyze_har_file_by_name(filename: str):
                     test_case_name=test_name
                 ))
 
-        # Add group test results
         for name, data in group_results.items():
             detailed_results.append(TestResult(
                 url="[GROUP]",
@@ -575,7 +628,6 @@ async def analyze_har_file_by_name(filename: str):
                 test_case_name=name
             ))
 
-        # Add group test results
         for name, data in group_results.items():
             detailed_results.append(TestResult(
                 url="[GROUP]",
@@ -584,12 +636,11 @@ async def analyze_har_file_by_name(filename: str):
                 details=data.get("message", ""),
                 test_case_name=name
             ))
-        
-        # Create analysis report
+
         total_tests = len(detailed_results)
         passed_tests = len([r for r in detailed_results if r.result == "Pass"])
         failed_tests = total_tests - passed_tests
-        
+
         report = AnalysisReport(
             total_requests=len(calls),
             total_tests=total_tests,
@@ -601,40 +652,36 @@ async def analyze_har_file_by_name(filename: str):
             raw_data=calls,
             group_results=group_results
         )
-        
-        # Store results
+
         report_id = str(uuid.uuid4())
         analysis_results_store[report_id] = report
-        
+
         return {"report_id": report_id, "report": report}
-        
+
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid HAR file format")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
+
 @app.post("/api/analyze-har")
 async def analyze_har(file: UploadFile = File(...)):
     if not file.filename.endswith('.har'):
         raise HTTPException(status_code=400, detail="Please upload a HAR file")
-    
+
     try:
-        # Read and parse HAR file
         contents = await file.read()
         har_data = json.loads(contents.decode('utf-8'))
-        
-        # Get test cases from Excel
+
         test_cases = load_tests_from_xlsx('../test_cases.xlsx')
         if not test_cases:
             raise HTTPException(status_code=400, detail="No test cases found in test_cases.xlsx. Please create test cases first.")
-        
-        # Analyze the HAR file
+
         calls = parse_har_for_calls(har_data, test_cases)
         url_failures, dimension_failures = analyze_failures(calls)
         test_groups = load_test_groups_from_json("../test_groups.json")
         group_results = evaluate_test_groups(calls, test_groups)
-        
-        # Create detailed results
+
         detailed_results = []
         for call in calls:
             for result, param_name, test_name in call.get("results", []):
@@ -645,12 +692,11 @@ async def analyze_har(file: UploadFile = File(...)):
                     details=result,
                     test_case_name=test_name
                 ))
-        
-        # Create analysis report
+
         total_tests = len(detailed_results)
         passed_tests = len([r for r in detailed_results if r.result == "Pass"])
         failed_tests = total_tests - passed_tests
-        
+
         report = AnalysisReport(
             total_requests=len(calls),
             total_tests=total_tests,
@@ -662,13 +708,12 @@ async def analyze_har(file: UploadFile = File(...)):
             raw_data=calls,
             group_results=group_results
         )
-        
-        # Store results
+
         report_id = str(uuid.uuid4())
         analysis_results_store[report_id] = report
-        
+
         return {"report_id": report_id, "report": report}
-        
+
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid HAR file format")
     except Exception as e:
