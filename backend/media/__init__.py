@@ -12,6 +12,7 @@ from .analyzer import (
     analyze_sessions,
     analyze_network_log_sessions,
 )
+from .natural import sequence_signature, detect_sequence_anomaly
 
 __all__ = [
     "MediaEvent",
@@ -25,4 +26,6 @@ __all__ = [
     "analyze_network_log",
     "analyze_sessions",
     "analyze_network_log_sessions",
+    "sequence_signature",
+    "detect_sequence_anomaly",
 ]
