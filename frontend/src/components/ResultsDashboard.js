@@ -33,6 +33,20 @@ const ResultsDashboard = ({ report }) => {
     );
   }
 
+  // Provide safe defaults for optional report fields to prevent
+  // runtime errors when the backend omits them.
+  const {
+    total_requests = 0,
+    total_tests = 0,
+    passed_tests = 0,
+    failed_tests = 0,
+    url_failures = {},
+    dimension_failures = {},
+    group_results = {},
+    detailed_results = [],
+    raw_data = []
+  } = report;
+
   const handleExportReport = async () => {
     try {
       // This would need the report ID from the backend
@@ -59,7 +73,7 @@ const ResultsDashboard = ({ report }) => {
   };
 
   const getFilteredResults = () => {
-    let filtered = report.detailed_results;
+    let filtered = detailed_results;
     
     if (selectedUrl) {
       filtered = filtered.filter(result => 
@@ -89,7 +103,7 @@ const ResultsDashboard = ({ report }) => {
           <div className="card-header">TOTAL REQUESTS</div>
           <div className="card-body text-center">
             <div style={{ fontSize: '36px', fontWeight: 'bold', margin: '16px 0' }}>
-              {report.total_requests}
+              {total_requests}
             </div>
             <Globe size={24} />
           </div>
@@ -99,7 +113,7 @@ const ResultsDashboard = ({ report }) => {
           <div className="card-header">TOTAL TESTS</div>
           <div className="card-body text-center">
             <div style={{ fontSize: '36px', fontWeight: 'bold', margin: '16px 0' }}>
-              {report.total_tests}
+              {total_tests}
             </div>
             <Settings size={24} />
           </div>
@@ -109,7 +123,7 @@ const ResultsDashboard = ({ report }) => {
           <div className="card-header">PASSED TESTS</div>
           <div className="card-body text-center">
             <div style={{ fontSize: '36px', fontWeight: 'bold', margin: '16px 0', color: 'green' }}>
-              {report.passed_tests}
+              {passed_tests}
             </div>
             <CheckCircle size={24} color="green" />
           </div>
@@ -119,7 +133,7 @@ const ResultsDashboard = ({ report }) => {
           <div className="card-header">FAILED TESTS</div>
           <div className="card-body text-center">
             <div style={{ fontSize: '36px', fontWeight: 'bold', margin: '16px 0', color: 'red' }}>
-              {report.failed_tests}
+              {failed_tests}
             </div>
             <XCircle size={24} color="red" />
           </div>
@@ -130,7 +144,7 @@ const ResultsDashboard = ({ report }) => {
         <div className="card">
           <div className="card-header">URL FAILURE ANALYSIS</div>
           <div className="card-body">
-            {Object.keys(report.url_failures).length === 0 ? (
+            {Object.keys(url_failures).length === 0 ? (
               <p>NO URL FAILURES DETECTED</p>
             ) : (
               <table className="table">
@@ -141,7 +155,7 @@ const ResultsDashboard = ({ report }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(report.url_failures)
+                  {Object.entries(url_failures)
                     .sort(([,a], [,b]) => b - a)
                     .map(([url, count]) => (
                     <tr key={url}>
@@ -158,7 +172,7 @@ const ResultsDashboard = ({ report }) => {
         <div className="card">
           <div className="card-header">PARAMETER FAILURE ANALYSIS</div>
           <div className="card-body">
-            {Object.keys(report.dimension_failures).length === 0 ? (
+            {Object.keys(dimension_failures).length === 0 ? (
               <p>NO PARAMETER FAILURES DETECTED</p>
             ) : (
               <table className="table">
@@ -169,7 +183,7 @@ const ResultsDashboard = ({ report }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(report.dimension_failures)
+                  {Object.entries(dimension_failures)
                     .sort(([,a], [,b]) => b - a)
                     .map(([param, count]) => (
                     <tr key={param}>
@@ -186,7 +200,7 @@ const ResultsDashboard = ({ report }) => {
         <div className="card">
           <div className="card-header">TEST GROUP RESULTS</div>
           <div className="card-body">
-            {Object.keys(report.group_results).length === 0 ? (
+            {Object.keys(group_results).length === 0 ? (
               <p>NO GROUPS DEFINED</p>
             ) : (
               <table className="table">
@@ -198,7 +212,7 @@ const ResultsDashboard = ({ report }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(report.group_results).map(([name, data]) => (
+                  {Object.entries(group_results).map(([name, data]) => (
                     <tr key={name}>
                       <td>{name}</td>
                       <td>{data.passed ? 'YES' : 'NO'}</td>
@@ -244,7 +258,7 @@ const ResultsDashboard = ({ report }) => {
         
         <div className="card">
           <div className="card-header">
-            DETAILED TEST RESULTS ({filteredResults.length} OF {report.detailed_results.length})
+            DETAILED TEST RESULTS ({filteredResults.length} OF {detailed_results.length})
           </div>
           <div className="card-body">
             <table className="table">
@@ -292,7 +306,7 @@ const ResultsDashboard = ({ report }) => {
     <div className="raw-data">
       <div className="card">
         <div className="card-header">
-          RAW REQUEST DATA ({report.raw_data.length} REQUESTS)
+          RAW REQUEST DATA ({raw_data.length} REQUESTS)
         </div>
         <div className="card-body">
           <table className="table">
@@ -306,7 +320,7 @@ const ResultsDashboard = ({ report }) => {
               </tr>
             </thead>
             <tbody>
-              {report.raw_data.map((request, index) => (
+              {raw_data.map((request, index) => (
                 <tr key={index}>
                   <td><strong>{request.method}</strong></td>
                   <td style={{ wordBreak: 'break-all', maxWidth: '300px' }}>
@@ -322,7 +336,7 @@ const ResultsDashboard = ({ report }) => {
                   </td>
                   <td>
                     <details>
-                      <summary>{Object.keys(request.parameters).length} PARAMS</summary>
+                      <summary>{Object.keys(request.parameters || {}).length} PARAMS</summary>
                       <pre style={{ 
                         fontSize: '12px', 
                         margin: '8px 0', 
@@ -332,7 +346,7 @@ const ResultsDashboard = ({ report }) => {
                         padding: '8px',
                         border: '1px solid #000'
                       }}>
-                        {JSON.stringify(request.parameters, null, 2)}
+                        {JSON.stringify(request.parameters || {}, null, 2)}
                       </pre>
                     </details>
                   </td>
