@@ -30,6 +30,10 @@ const App = () => {
   const fetchTestCases = async () => {
     try {
       const response = await fetch(`${BACKEND_URL}/api/test-cases`);
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || `Request failed with status ${response.status}`);
+      }
       const data = await response.json();
       setTestCases(data.test_cases || []);
     } catch (error) {
@@ -40,6 +44,10 @@ const App = () => {
   const fetchTestGroups = async () => {
     try {
       const response = await fetch(`${BACKEND_URL}/api/test-groups`);
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || `Request failed with status ${response.status}`);
+      }
       const data = await response.json();
       setTestGroups(data.test_groups || []);
     } catch (error) {

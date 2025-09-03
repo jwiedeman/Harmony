@@ -18,10 +18,15 @@ const LogAnalyzer = ({ onAnalysisComplete }) => {
   const fetchAvailableLogFiles = async () => {
     try {
       const response = await fetch(`${BACKEND_URL}/api/log-files`);
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || `Request failed with status ${response.status}`);
+      }
       const data = await response.json();
       setAvailableLogFiles(data.log_files || []);
     } catch (error) {
       console.error('Error fetching available log files:', error);
+      setMessage('ERROR: ' + error.message);
     }
   };
 
@@ -94,7 +99,13 @@ const LogAnalyzer = ({ onAnalysisComplete }) => {
         });
       }
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(text || 'Invalid response from server');
+      }
 
       if (response.ok) {
         setMessage('ANALYSIS COMPLETED SUCCESSFULLY');
