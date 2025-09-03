@@ -62,3 +62,21 @@ def test_fingerprint_platform_from_user_agent():
     }
     fp = fingerprint_event(event)
     assert fp["platform"] == "roku"
+
+
+def test_fingerprint_sdk_version_from_query_and_body():
+    # Query parameter extraction
+    event = {
+        "url": "https://metrics.hb-api.omtrdc.net/x",
+        "queryParams": {"s:ver": "3.0.1"},
+    }
+    fp = fingerprint_event(event)
+    assert fp["sdk_version"] == "3.0.1"
+
+    # Nested body field extraction (Adobe Edge style)
+    event = {
+        "url": "https://example.adobedc.net/ee/v1/interact",
+        "bodyJSON": {"xdm": {"implementationDetails": {"version": "2.4.0"}}},
+    }
+    fp = fingerprint_event(event)
+    assert fp["sdk_version"] == "2.4.0"

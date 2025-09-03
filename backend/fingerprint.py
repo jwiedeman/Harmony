@@ -47,6 +47,42 @@ def _detect_platform(event: Dict[str, object]) -> Optional[str]:
     return None
 
 
+def _detect_sdk_version(event: Dict[str, object]) -> Optional[str]:
+    """Best-effort extraction of the client SDK/version.
+
+    The function inspects common query parameter names as well as a few
+    structured locations inside JSON request bodies.  The heuristics are kept
+    intentionally lightweight and return ``None`` when a version cannot be
+    confidently determined.
+    """
+
+    # --- query parameters ---
+    params = event.get("queryParams") or {}
+    for key in ("sdkVersion", "sdk_version", "s:ver", "ver", "version", "v"):
+        value = params.get(key)
+        if isinstance(value, str) and value:
+            return value
+
+    # --- JSON body fields ---
+    body = event.get("bodyJSON")
+    if isinstance(body, dict):
+        # direct top-level hints
+        for key in ("sdkVersion", "sdk_version", "version"):
+            value = body.get(key)
+            if isinstance(value, str) and value:
+                return value
+
+        # nested under XDM implementation details (Adobe Edge)
+        xdm = body.get("xdm")
+        if isinstance(xdm, dict):
+            impl = xdm.get("implementationDetails") or {}
+            value = impl.get("version") or impl.get("implementationVersion")
+            if isinstance(value, str) and value:
+                return value
+
+    return None
+
+
 def fingerprint_event(event: Dict[str, object]) -> Dict[str, Optional[str]]:
     """Return analytics metadata for a single network ``event``.
 
@@ -72,6 +108,7 @@ def fingerprint_event(event: Dict[str, object]) -> Dict[str, Optional[str]]:
     transport: Optional[str] = None
     profile: Optional[str] = None
     platform: Optional[str] = _detect_platform(event)
+    sdk_version: Optional[str] = _detect_sdk_version(event)
 
     # --- Adobe Analytics and Media ---
     if host.endswith("hb-api.omtrdc.net") or host.endswith("hb.omtrdc.net"):
@@ -98,6 +135,7 @@ def fingerprint_event(event: Dict[str, object]) -> Dict[str, Optional[str]]:
         "transport": transport,
         "profile": profile,
         "platform": platform,
+        "sdk_version": sdk_version,
     }
 
 

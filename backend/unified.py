@@ -33,6 +33,9 @@ class UnifiedRequest(BaseModel):
     transport: Optional[str] = Field(None, description="Detected transport mechanism")
     profile: Optional[str] = Field(None, description="Detected profile/platform")
     platform: Optional[str] = Field(None, description="Detected client platform")
+    sdk_version: Optional[str] = Field(
+        None, description="Detected client SDK version"
+    )
     source: Dict[str, Any] = Field(default_factory=dict, description="Origin of the request")
 
 
@@ -59,6 +62,7 @@ def to_unified_requests(events: List[Dict[str, Any]]) -> List[UnifiedRequest]:
                 transport=meta.get("transport"),
                 profile=meta.get("profile"),
                 platform=meta.get("platform"),
+                sdk_version=meta.get("sdk_version"),
                 source=event.get("source") or {},
             )
         )

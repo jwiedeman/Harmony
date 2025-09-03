@@ -46,3 +46,10 @@ def test_unified_request_with_platform():
     }
     req = to_unified_requests([event])[0]
     assert req.platform == "android"
+
+
+def test_unified_request_sdk_version():
+    event = make_event("https://metrics.hb-api.omtrdc.net/x")
+    event["queryParams"] = {"s:ver": "4.2.0"}
+    req = to_unified_requests([event])[0]
+    assert req.sdk_version == "4.2.0"
