@@ -2,6 +2,8 @@ import io
 import json
 
 from backend.parsers.har_parser import parse_har
+import base64
+import gzip
 
 
 def test_parse_har_basic():
@@ -29,12 +31,13 @@ def test_parse_har_basic():
             ]
         }
     }
-    events = parse_har(io.StringIO(json.dumps(sample)))
+    events = parse_har(io.StringIO(json.dumps(sample)), "sample.har")
     assert len(events) == 1
     ev = events[0]
     assert ev["url"] == "https://example.com/v1/events"
     assert ev["queryParams"]["s:event:type"] == "play"
     assert ev["bodyJSON"] == {"foo": "bar"}
+    assert ev["source"] == {"file": "sample.har", "index": 0}
 
 
 def test_parse_har_query_from_url():
@@ -52,5 +55,28 @@ def test_parse_har_query_from_url():
             ]
         }
     }
-    events = parse_har(io.StringIO(json.dumps(sample)))
+    events = parse_har(io.StringIO(json.dumps(sample)), "sample.har")
     assert events[0]["queryParams"] == {"alpha": "1", "beta": "two"}
+
+
+def test_parse_har_decompress_body():
+    body = json.dumps({"foo": "bar"}).encode("utf-8")
+    encoded = base64.b64encode(gzip.compress(body)).decode("ascii")
+    sample = {
+        "log": {
+            "entries": [
+                {
+                    "startedDateTime": "2023-01-01T00:00:00Z",
+                    "request": {
+                        "url": "https://example.com/v1/events",
+                        "method": "POST",
+                        "headers": [{"name": "Content-Encoding", "value": "gzip"}],
+                        "postData": {"text": encoded, "encoding": "base64"},
+                    },
+                    "response": {"status": 200, "headers": []},
+                }
+            ]
+        }
+    }
+    events = parse_har(io.StringIO(json.dumps(sample)), "sample.har")
+    assert events[0]["bodyJSON"] == {"foo": "bar"}

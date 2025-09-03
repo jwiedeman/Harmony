@@ -44,11 +44,11 @@ def parse_network_file(file_obj: IO[Any], filename: str | None = None) -> List[D
 
     ext = os.path.splitext(filename or "")[1].lower()
     if ext == ".har":
-        return parse_har(file_obj)
+        return parse_har(file_obj, filename)
     if ext == ".chlsj":
-        return parse_chlsj(file_obj)
+        return parse_chlsj(file_obj, filename)
     if ext == ".chls":
-        return parse_chls(file_obj)
+        return parse_chls(file_obj, filename)
 
     # Extension unknown – attempt to sniff the contents.  Read the full payload
     # into memory so it can be wrapped in the appropriate IO type for the
@@ -61,7 +61,7 @@ def parse_network_file(file_obj: IO[Any], filename: str | None = None) -> List[D
             # Binary data that isn't valid UTF-8 is assumed to be a Charles
             # ``.chls`` session.  ``parse_chls`` will raise a helpful error if
             # the CLI is unavailable.
-            return parse_chls(io.BytesIO(content))
+            return parse_chls(io.BytesIO(content), filename)
     else:
         text = content
 
@@ -76,16 +76,16 @@ def parse_network_file(file_obj: IO[Any], filename: str | None = None) -> List[D
         if isinstance(data, dict) and isinstance(data.get("log"), dict) and isinstance(
             data["log"].get("entries"), list
         ):
-            return parse_har(io.StringIO(text))
+            return parse_har(io.StringIO(text), filename)
         if isinstance(data, dict) and isinstance(data.get("entries"), list):
-            return parse_chlsj(io.StringIO(text))
+            return parse_chlsj(io.StringIO(text), filename)
         # Fallback to the HAR parser for any other JSON structure – it will
         # surface a meaningful error if the shape is incompatible.
-        return parse_har(io.StringIO(text))
+        return parse_har(io.StringIO(text), filename)
 
     # Non-JSON text is treated as a binary Charles session.
     if isinstance(content, bytes):
-        return parse_chls(io.BytesIO(content))
+        return parse_chls(io.BytesIO(content), filename)
     raise ValueError(f"Unsupported file type: {ext}")
 
 
