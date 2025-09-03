@@ -1,6 +1,11 @@
 import pytest
 
-from backend.media import MediaEvent, analyze_session, analyze_network_log
+from backend.media import (
+    MediaEvent,
+    analyze_session,
+    analyze_network_log,
+    analyze_sessions,
+)
 
 
 def make_event(t, ts, asset="main"):
@@ -70,3 +75,68 @@ def test_analyze_network_log_normalizes_events():
     assert result["metrics"]["content"] == pytest.approx(10.0, rel=1e-3)
     assert result["violations"]["ordering"] == []
     assert result["violations"]["timing"] == []
+
+
+def test_analyze_sessions_groups_results_by_session():
+    events = [
+        # Events interleaved from two sessions
+        MediaEvent(
+            sessionId="s1",
+            type="play",
+            tsDevice=0,
+            playhead=0.0,
+            streamType="vod",
+            assetType="main",
+            params={"s:asset:type": "main"},
+        ),
+        MediaEvent(
+            sessionId="s2",
+            type="play",
+            tsDevice=0,
+            playhead=0.0,
+            streamType="vod",
+            assetType="main",
+            params={"s:asset:type": "main"},
+        ),
+        MediaEvent(
+            sessionId="s1",
+            type="ping",
+            tsDevice=10000,
+            playhead=10.0,
+            streamType="vod",
+            assetType="main",
+            params={"s:asset:type": "main"},
+        ),
+        MediaEvent(
+            sessionId="s2",
+            type="ping",
+            tsDevice=5000,
+            playhead=5.0,
+            streamType="vod",
+            assetType="main",
+            params={"s:asset:type": "main"},
+        ),
+        MediaEvent(
+            sessionId="s2",
+            type="sessionEnd",
+            tsDevice=10000,
+            playhead=10.0,
+            streamType="vod",
+            assetType="main",
+            params={"s:asset:type": "main"},
+        ),
+        MediaEvent(
+            sessionId="s1",
+            type="sessionEnd",
+            tsDevice=20000,
+            playhead=20.0,
+            streamType="vod",
+            assetType="main",
+            params={"s:asset:type": "main"},
+        ),
+    ]
+
+    result = analyze_sessions(events)
+    assert set(result.keys()) == {"s1", "s2"}
+    assert result["s1"]["metrics"]["content"] == pytest.approx(20.0, rel=1e-3)
+    assert result["s2"]["metrics"]["content"] == pytest.approx(10.0, rel=1e-3)

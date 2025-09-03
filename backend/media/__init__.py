@@ -6,7 +6,12 @@ from .metrics import compute_basic_metrics
 from .state_machine import validate_event_order
 from .timing import validate_ping_cadence, compute_ping_integrity
 from .params import validate_param_rules
-from .analyzer import analyze_session, analyze_network_log
+from .analyzer import (
+    analyze_session,
+    analyze_network_log,
+    analyze_sessions,
+    analyze_network_log_sessions,
+)
 
 __all__ = [
     "MediaEvent",
@@ -18,4 +23,6 @@ __all__ = [
     "validate_param_rules",
     "analyze_session",
     "analyze_network_log",
+    "analyze_sessions",
+    "analyze_network_log_sessions",
 ]
