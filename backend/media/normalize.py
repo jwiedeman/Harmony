@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List
+from urllib.parse import parse_qsl
 
 from .models import MediaEvent
 
@@ -34,6 +35,22 @@ def network_events_to_media_events(events: Iterable[Dict[str, Any]]) -> List[Med
         body = event.get("bodyJSON")
         query = event.get("queryParams") or {}
 
+        # Some tools (including Charles and certain HAR generators) place
+        # form-encoded parameters in ``postData`` rather than the query
+        # string.  Extract those so normalization has a unified view of all
+        # parameters regardless of transport.
+        post = event.get("postData") or {}
+        form_params: Dict[str, Any] = {}
+        params_list = post.get("params")
+        if isinstance(params_list, list):
+            form_params = {
+                p.get("name"): p.get("value") for p in params_list
+            }
+        elif isinstance(post.get("text"), str) and post.get("mimeType", "").startswith(
+            "application/x-www-form-urlencoded"
+        ):
+            form_params = dict(parse_qsl(post.get("text", "")))
+
         # If the payload contains an explicit ``events`` array iterate over
         # each entry.  Otherwise treat the request itself as a single event
         # whose parameters live in the query string/body top level.
@@ -44,18 +61,19 @@ def network_events_to_media_events(events: Iterable[Dict[str, Any]]) -> List[Med
             combined = {}
             if isinstance(body, dict):
                 combined.update(body)
-            combined.update(query)
             items = [combined]
 
         for item in items:
             params = dict(item.get("params", {}))
-            # Merge query params for convenience when item represents the
+            # Merge query/form params for convenience when item represents the
             # entire request rather than an element of ``events``.
-            if params is item and query:
+            if params is item and (query or form_params):
                 params.update(query)
+                params.update(form_params)
 
             if params is not item:
                 params.update(query)
+                params.update(form_params)
                 params.update({k: v for k, v in item.items() if k != "params"})
 
             # Adobe's Media Collection API uses both the legacy ``s:*`` style
