@@ -103,3 +103,25 @@ def test_network_events_to_media_events_form_params():
     assert me.playhead == 5
     assert me.streamType == "vod"
     assert me.assetType == "main"
+
+
+def test_session_id_extracted_from_location_header():
+    """SessionStart events without a session id in params use response headers."""
+    log = [
+        {
+            "bodyJSON": {
+                "events": [
+                    {"eventType": "sessionStart", "params": {"l:event:ts": "1000"}}
+                ]
+            },
+            "queryParams": {},
+            "responseHeaders": {
+                "Location": "https://example.com/v1/sessions/abc123"
+            },
+        }
+    ]
+    media_events = network_events_to_media_events(log)
+    assert len(media_events) == 1
+    me = media_events[0]
+    assert me.sessionId == "abc123"
+    assert me.type == "sessionStart"

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, urlparse
 
 from .models import MediaEvent
 
@@ -18,6 +18,30 @@ def _coerce_float(value: Any, default: float = 0.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _session_id_from_response(event: Dict[str, Any]) -> str | None:
+    """Extract a session identifier from a network event response.
+
+    The Media Collection API returns the newly created session identifier in
+    the ``Location`` header of the session creation response.  Charles/HAR
+    parsers preserve response headers as a mapping.  This helper attempts to
+    parse the header and return the last path component as the session id.
+    """
+
+    headers = event.get("responseHeaders") or {}
+    for name, value in headers.items():
+        if name.lower() == "location" and isinstance(value, str):
+            try:
+                path = urlparse(value).path
+            except Exception:
+                return None
+            if path:
+                return path.rstrip("/").split("/")[-1]
+    # Some tools may include the session id directly in the response body
+    # which is not currently captured by our parsers.  The helper therefore
+    # only focuses on the ``Location`` header for now.
+    return None
 
 
 def network_events_to_media_events(events: Iterable[Dict[str, Any]]) -> List[MediaEvent]:
@@ -94,6 +118,8 @@ def network_events_to_media_events(events: Iterable[Dict[str, Any]]) -> List[Med
                 or params.get("sessionId")
                 or params.get("sid")
             )
+            if not session_id and event_type == "sessionStart":
+                session_id = _session_id_from_response(event)
             if not event_type or not session_id:
                 # Not an Adobe media event
                 continue
