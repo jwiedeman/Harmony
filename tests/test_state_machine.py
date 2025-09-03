@@ -48,3 +48,13 @@ def test_ad_break_complete_without_ad():
     ]
     violations = validate_event_order(events)
     assert any("adBreakComplete without adStart" in v for v in violations)
+
+
+def test_play_while_already_playing():
+    events = [
+        make_event("sessionStart", 0),
+        make_event("play", 1000),
+        make_event("play", 2000),
+    ]
+    violations = validate_event_order(events)
+    assert any("play while already playing" in v for v in violations)
