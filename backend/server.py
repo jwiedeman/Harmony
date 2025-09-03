@@ -14,9 +14,16 @@ import shutil
 import glob
 from openpyxl import load_workbook
 
-from .parsers import parse_network_file
-from .media import analyze_network_log_sessions
-from .adobe import extract_rsid
+if __package__ is None or __package__ == "":
+    import sys
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    from backend.parsers import parse_network_file
+    from backend.media import analyze_network_log_sessions
+    from backend.adobe import extract_rsid
+else:
+    from .parsers import parse_network_file
+    from .media import analyze_network_log_sessions
+    from .adobe import extract_rsid
 import io
 
 app = FastAPI(title="Harmony QA API", description="QA Testing API for HAR file analysis")
