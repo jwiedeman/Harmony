@@ -29,6 +29,7 @@ def test_parse_network_file_har():
     events = parse_network_file(io.StringIO(json.dumps(sample)), "file.har")
     assert len(events) == 1
     assert events[0]["url"] == "https://example.com/v1/events"
+    assert events[0]["source"] == {"file": "file.har", "index": 0}
 
 
 def test_parse_network_file_chlsj():
@@ -36,6 +37,7 @@ def test_parse_network_file_chlsj():
     events = parse_network_file(io.StringIO(json.dumps(sample)), "file.chlsj")
     assert len(events) == 1
     assert events[0]["url"] == "https://example.com/v1/events"
+    assert events[0]["source"] == {"file": "file.chlsj", "index": 0}
 
 
 def test_parse_network_file_chls_no_charles(tmp_path):

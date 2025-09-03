@@ -1,9 +1,11 @@
 import json
-from typing import List, Dict, Any, IO
+from typing import List, Dict, Any, IO, Optional
 from urllib.parse import urlparse, parse_qsl
 
+from .utils import decode_body
 
-def parse_chlsj(file_obj: IO) -> List[Dict[str, Any]]:
+
+def parse_chlsj(file_obj: IO, source_name: Optional[str] = None) -> List[Dict[str, Any]]:
     """Parse a Charles .chlsj session file into a list of network events.
 
     The returned structure roughly matches the NetworkEvent schema used
@@ -21,7 +23,7 @@ def parse_chlsj(file_obj: IO) -> List[Dict[str, Any]]:
     )
 
     events: List[Dict[str, Any]] = []
-    for entry in entries:
+    for idx, entry in enumerate(entries):
         request = entry.get("request", {})
         response = entry.get("response", {})
         event: Dict[str, Any] = {
@@ -41,6 +43,7 @@ def parse_chlsj(file_obj: IO) -> List[Dict[str, Any]]:
             },
             "bodyJSON": None,
             "raw": entry,
+            "source": {"file": source_name, "index": idx},
         }
 
         # Some Charles exports omit the ``queryString`` array when the request
@@ -53,8 +56,15 @@ def parse_chlsj(file_obj: IO) -> List[Dict[str, Any]]:
         post = event.get("postData") or {}
         text = post.get("text")
         if isinstance(text, str):
+            encoding_header = event["requestHeaders"].get("Content-Encoding") or event[
+                "requestHeaders"
+            ].get("content-encoding")
             try:
-                event["bodyJSON"] = json.loads(text)
+                decoded = decode_body(text, encoding_header, post.get("encoding") == "base64")
+            except Exception:
+                decoded = text
+            try:
+                event["bodyJSON"] = json.loads(decoded)
             except json.JSONDecodeError:
                 # leave bodyJSON as None if the payload isn't valid JSON
                 pass

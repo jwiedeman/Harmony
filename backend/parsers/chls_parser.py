@@ -2,12 +2,12 @@ import os
 import shutil
 import subprocess
 import tempfile
-from typing import BinaryIO, Dict, List
+from typing import BinaryIO, Dict, List, Optional
 
 from .har_parser import parse_har
 
 
-def parse_chls(file_obj: BinaryIO) -> List[Dict[str, object]]:
+def parse_chls(file_obj: BinaryIO, source_name: Optional[str] = None) -> List[Dict[str, object]]:
     """Parse a Charles ``.chls`` session file.
 
     The binary ``.chls`` format must be converted to HAR or ``.chlsj`` using the
@@ -31,7 +31,7 @@ def parse_chls(file_obj: BinaryIO) -> List[Dict[str, object]]:
     try:
         subprocess.run([charles, "convert", src_path, dst_path], check=True, capture_output=True)
         with open(dst_path, "r", encoding="utf-8") as converted:
-            return parse_har(converted)
+            return parse_har(converted, source_name)
     except subprocess.CalledProcessError as e:
         stderr = e.stderr.decode("utf-8", errors="ignore") if e.stderr else ""
         raise RuntimeError(
