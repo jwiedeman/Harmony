@@ -58,3 +58,37 @@ def test_play_while_already_playing():
     ]
     violations = validate_event_order(events)
     assert any("play while already playing" in v for v in violations)
+
+
+def test_pause_not_resumed():
+    events = [
+        make_event("sessionStart", 0),
+        make_event("play", 1000),
+        make_event("pauseStart", 2000),
+        make_event("sessionComplete", 3000),
+    ]
+    violations = validate_event_order(events)
+    assert any("pause" in v for v in violations)
+
+
+def test_buffer_not_resumed():
+    events = [
+        make_event("sessionStart", 0),
+        make_event("play", 1000),
+        make_event("bufferStart", 2000),
+        make_event("sessionComplete", 3000),
+    ]
+    violations = validate_event_order(events)
+    assert any("buffer" in v for v in violations)
+
+
+def test_duplicate_pause_start():
+    events = [
+        make_event("sessionStart", 0),
+        make_event("play", 1000),
+        make_event("pauseStart", 2000),
+        make_event("pauseStart", 2500),
+        make_event("play", 3000),
+    ]
+    violations = validate_event_order(events)
+    assert any("pauseStart while already paused" in v for v in violations)
