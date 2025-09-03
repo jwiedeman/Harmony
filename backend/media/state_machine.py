@@ -54,13 +54,20 @@ def validate_event_order(events: Iterable[MediaEvent]) -> List[str]:
         t = event.type
 
         if t == "sessionStart":
-            state = _PlaybackState.MAIN
+            # A session start does not imply playback has begun.  Treat the
+            # player as idle until an explicit ``play`` arrives so that
+            # duplicate plays can be detected correctly.
+            state = _PlaybackState.IDLE
             ad_break_active = False
             ad_active = False
             continue
 
         if t == "play":
-            # Resume from pause or buffer
+            # ``play`` should only occur when resuming from pause or buffer or
+            # at the very start of a session.  Receiving another ``play`` while
+            # already playing indicates a missing state transition.
+            if state in {_PlaybackState.MAIN, _PlaybackState.AD}:
+                violations.append("play while already playing")
             state = _PlaybackState.MAIN
             continue
 
