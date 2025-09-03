@@ -74,3 +74,32 @@ def test_network_events_to_media_events_camel_case_fields():
     assert me.playhead == 5.0
     assert me.streamType == "vod"
     assert me.assetType == "main"
+
+
+def test_network_events_to_media_events_form_params():
+    """Parameters encoded in POST bodies are recognized."""
+    log = [
+        {
+            "queryParams": {},
+            "bodyJSON": None,
+            "postData": {
+                "params": [
+                    {"name": "s:event:type", "value": "play"},
+                    {"name": "s:event:sid", "value": "sid123"},
+                    {"name": "l:event:ts", "value": "1000"},
+                    {"name": "l:event:playhead", "value": "5"},
+                    {"name": "s:stream:type", "value": "vod"},
+                    {"name": "s:asset:type", "value": "main"},
+                ]
+            },
+        }
+    ]
+    media_events = network_events_to_media_events(log)
+    assert len(media_events) == 1
+    me = media_events[0]
+    assert me.sessionId == "sid123"
+    assert me.type == "play"
+    assert me.tsDevice == 1000
+    assert me.playhead == 5
+    assert me.streamType == "vod"
+    assert me.assetType == "main"
