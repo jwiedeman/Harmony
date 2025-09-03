@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import TestCaseManager from './components/TestCaseManager';
 import TestGroupManager from './components/TestGroupManager';
-import HarAnalyzer from './components/HarAnalyzer';
+import LogAnalyzer from './components/LogAnalyzer';
 import ResultsDashboard from './components/ResultsDashboard';
 import { FileText, Upload, BarChart3, Settings, Layers } from 'lucide-react';
 import { BACKEND_URL } from './config';
@@ -17,7 +17,7 @@ const App = () => {
   const tabs = [
     { id: 'test-cases', label: 'TEST CASES', icon: Settings },
     { id: 'test-groups', label: 'TEST GROUPS', icon: Layers },
-    { id: 'analyzer', label: 'HAR ANALYZER', icon: Upload },
+    { id: 'analyzer', label: 'LOG ANALYZER', icon: Upload },
     { id: 'results', label: 'RESULTS', icon: BarChart3 }
   ];
 
@@ -59,7 +59,7 @@ const App = () => {
       case 'test-groups':
         return <TestGroupManager testGroups={testGroups} testCases={testCases} onGroupsUpdate={fetchTestGroups} />;
       case 'analyzer':
-        return <HarAnalyzer onAnalysisComplete={handleAnalysisComplete} />;
+        return <LogAnalyzer onAnalysisComplete={handleAnalysisComplete} />;
       case 'results':
         return <ResultsDashboard report={analysisReport} />;
       default:
@@ -111,7 +111,7 @@ const App = () => {
 
       <footer className="app-footer">
         <div className="footer-content">
-          <span>HARMONY QA v1.0 | HTTP ARCHIVE ANALYSIS SYSTEM</span>
+          <span>HARMONY QA v1.0 | NETWORK LOG ANALYSIS SYSTEM</span>
           <span>{new Date().toISOString().split('T')[0]} {new Date().toTimeString().split(' ')[0]}</span>
         </div>
       </footer>
