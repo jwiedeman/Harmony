@@ -101,6 +101,46 @@ func TestAdobeAppMeasurement_Parse_MultipleEvents(t *testing.T) {
 	}
 }
 
+func TestAdobeAppMeasurement_Parse_EventSerialization(t *testing.T) {
+	p := &AdobeAppMeasurement{}
+	ev := har.NetworkEvent{
+		Method: "GET",
+		URL:    "https://example.com/b/ss/rsid/1/JS-2.0/s1",
+		QueryParams: map[string]string{
+			"events": "event1,event50:abc123,event52=3",
+		},
+		Headers:    map[string]string{},
+		PostParams: map[string]string{},
+	}
+
+	b := p.Parse(ev)
+	expected := []string{"event1", "event50", "event52"}
+	if len(b.EventList) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(b.EventList), b.EventList)
+	}
+	for i, want := range expected {
+		if b.EventList[i] != want {
+			t.Errorf("EventList[%d] = %q, want %q", i, b.EventList[i], want)
+		}
+	}
+}
+
+func TestAdobeAppMeasurement_Parse_MultiSuiteRSID(t *testing.T) {
+	p := &AdobeAppMeasurement{}
+	ev := har.NetworkEvent{
+		Method:      "GET",
+		URL:         "https://example.com/b/ss/rsid1,rsid2/1/JS-2.0/s1",
+		QueryParams: map[string]string{},
+		Headers:     map[string]string{},
+		PostParams:  map[string]string{},
+	}
+
+	b := p.Parse(ev)
+	if b.RSID != "rsid1,rsid2" {
+		t.Errorf("RSID = %q, want rsid1,rsid2", b.RSID)
+	}
+}
+
 func TestParseAll(t *testing.T) {
 	events := []har.NetworkEvent{
 		{

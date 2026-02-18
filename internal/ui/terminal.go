@@ -23,7 +23,13 @@ func PrintReport(report *validator.Report) {
 		mappingLabel = report.MappingName + " mapping"
 	}
 	fmt.Printf("%sSpecWatch v0.1.0%s — Validating against: %s\n", bold, reset, mappingLabel)
-	fmt.Printf("Total analytics calls detected: %d\n\n", report.TotalCalls)
+	fmt.Printf("Source: %d network entries, %d analytics beacons detected\n\n",
+		report.TotalEntries, report.TotalCalls)
+
+	if report.TotalCalls == 0 {
+		printNoBeaconsHelp(report)
+		return
+	}
 
 	for _, br := range report.Beacons {
 		printBeaconResult(br)
@@ -119,6 +125,26 @@ func printSummary(report *validator.Report) {
 		}
 	}
 
+	fmt.Println()
+}
+
+func printNoBeaconsHelp(report *validator.Report) {
+	fmt.Printf("%sNo analytics beacons detected.%s\n\n", yellow, reset)
+	if report.TotalEntries > 0 {
+		fmt.Printf("The HAR contained %d network entries, but none matched known\n", report.TotalEntries)
+		fmt.Println("analytics endpoint patterns.")
+	} else {
+		fmt.Println("The HAR file contained no network entries.")
+	}
+	fmt.Println()
+	fmt.Println("Supported patterns:")
+	fmt.Println("  - Adobe AppMeasurement: /b/ss/")
+	fmt.Println()
+	fmt.Println("Possible causes:")
+	fmt.Println("  - The HAR was captured without analytics traffic")
+	fmt.Println("  - The analytics platform is not yet supported (GA4, Tealium, etc.)")
+	fmt.Println()
+	fmt.Println("Tip: Use 'specwatch validate --beacon <url>' to test a single beacon URL.")
 	fmt.Println()
 }
 

@@ -58,12 +58,13 @@ type IssueSummary struct {
 
 // Report holds the complete validation run results.
 type Report struct {
-	TotalCalls  int            `json:"total_calls"`
-	Matched     int            `json:"matched"`
-	Unmatched   int            `json:"unmatched"`
-	Passed      int            `json:"passed"`
-	Failed      int            `json:"failed"`
-	Beacons     []BeaconResult `json:"beacons"`
-	TopIssues   []IssueSummary `json:"top_issues"`
-	MappingName string         `json:"mapping_name"`
+	TotalEntries int            `json:"total_entries"` // total HAR network entries before filtering
+	TotalCalls   int            `json:"total_calls"`   // analytics beacons detected
+	Matched      int            `json:"matched"`
+	Unmatched    int            `json:"unmatched"`
+	Passed       int            `json:"passed"`
+	Failed       int            `json:"failed"`
+	Beacons      []BeaconResult `json:"beacons"`
+	TopIssues    []IssueSummary `json:"top_issues"`
+	MappingName  string         `json:"mapping_name"`
 }

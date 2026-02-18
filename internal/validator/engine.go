@@ -33,7 +33,8 @@ func (e *Engine) ValidateHAR(path string) (*Report, error) {
 	beacons := parsers.ParseAll(events)
 
 	report := &Report{
-		TotalCalls: len(beacons),
+		TotalEntries: len(events),
+		TotalCalls:   len(beacons),
 	}
 	if e.Mapping != nil {
 		report.MappingName = e.Mapping.Name
@@ -61,6 +62,11 @@ func (e *Engine) ValidateHAR(path string) (*Report, error) {
 	report.TopIssues = buildTopIssues(issueCounts)
 
 	return report, nil
+}
+
+// ValidateBeacon validates a single beacon against the spec and mapping.
+func (e *Engine) ValidateBeacon(beacon parsers.Beacon) BeaconResult {
+	return e.validateBeacon(beacon, make(map[string]int))
 }
 
 func (e *Engine) validateBeacon(beacon parsers.Beacon, issueCounts map[string]int) BeaconResult {
@@ -278,10 +284,22 @@ func (e *Engine) validateRSID(rsid string) DimensionResult {
 		return result
 	}
 
-	if rsid == e.Mapping.ProdRSID {
+	// Handle multi-suite tagging: RSID may be comma-separated (e.g. "rsid1,rsid2")
+	rsids := strings.Split(rsid, ",")
+	matchedProd, matchedDev := false, false
+	for _, r := range rsids {
+		if r == e.Mapping.ProdRSID {
+			matchedProd = true
+		}
+		if r == e.Mapping.DevRSID {
+			matchedDev = true
+		}
+	}
+
+	if matchedProd {
 		result.Status = Pass
 		result.Message = fmt.Sprintf("%s (matches %s mapping)", rsid, e.Mapping.Name)
-	} else if rsid == e.Mapping.DevRSID {
+	} else if matchedDev {
 		result.Status = Pass
 		result.Message = fmt.Sprintf("%s (dev/QA — matches %s mapping)", rsid, e.Mapping.Name)
 	} else {

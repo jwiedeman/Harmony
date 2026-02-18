@@ -53,9 +53,17 @@ func (a *AdobeAppMeasurement) Parse(ev har.NetworkEvent) Beacon {
 		b.PageURL = r
 	}
 
-	// Events list
+	// Events list — strip serialization IDs (event50:abc123) and increments (event52=3)
 	if events, ok := params["events"]; ok && events != "" {
-		b.EventList = strings.Split(events, ",")
+		raw := strings.Split(events, ",")
+		b.EventList = make([]string, len(raw))
+		for i, e := range raw {
+			e = strings.TrimSpace(e)
+			if idx := strings.IndexAny(e, ":="); idx > 0 {
+				e = e[:idx]
+			}
+			b.EventList[i] = e
+		}
 	}
 
 	// eVars and Props

@@ -14,6 +14,7 @@ type Spec struct {
 	Events   map[string]*EventSpec // event name -> spec
 	Mappings map[string]*Mapping   // mapping name -> mapping
 	Packages map[string]*Package   // package name -> package
+	Warnings []string              // non-fatal warnings from loading
 }
 
 // LoadSpec reads a spec directory and returns a fully resolved Spec.
@@ -84,6 +85,17 @@ func LoadSpec(dir string) (*Spec, error) {
 	for _, ev := range s.Events {
 		resolveEnumRefs(ev.Required, s.Enums)
 		resolveEnumRefs(ev.Optional, s.Enums)
+	}
+
+	// 6. Generate warnings for missing/empty sections
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		s.Warnings = append(s.Warnings, fmt.Sprintf("spec directory %q does not exist", dir))
+	}
+	if len(s.Events) == 0 {
+		s.Warnings = append(s.Warnings, "no event specs found (expected events/*.md)")
+	}
+	if len(s.Mappings) == 0 {
+		s.Warnings = append(s.Warnings, "no mappings found (expected mappings/*.md)")
 	}
 
 	return s, nil
@@ -231,6 +243,7 @@ func parseMappingFile(path string) (*Mapping, error) {
 	}
 
 	m := &Mapping{
+		Name:     strings.TrimSuffix(filepath.Base(path), ".md"),
 		DimMap:   make(map[string]DimMapping),
 		EventMap: make(map[string]string),
 	}
@@ -241,12 +254,7 @@ func parseMappingFile(path string) (*Mapping, error) {
 		trimmed := strings.TrimSpace(line)
 
 		if strings.HasPrefix(trimmed, "# ") && !strings.HasPrefix(trimmed, "## ") {
-			m.Name = strings.ToLower(strings.ReplaceAll(
-				strings.TrimSpace(strings.TrimPrefix(trimmed, "# ")),
-				" ", "_",
-			))
-			// Also handle multi-word names: "Fox News & Fox Business Mapping" -> "fox_news"
-			// Use filename as fallback
+			m.DisplayName = strings.TrimSpace(strings.TrimPrefix(trimmed, "# "))
 			continue
 		}
 
@@ -294,11 +302,6 @@ func parseMappingFile(path string) (*Mapping, error) {
 				m.EventMap[cells[0]] = cells[1]
 			}
 		}
-	}
-
-	// Use filename as name if heading was complex
-	if m.Name == "" || len(m.Name) > 30 {
-		m.Name = strings.TrimSuffix(filepath.Base(path), ".md")
 	}
 
 	return m, nil

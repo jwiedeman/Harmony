@@ -2,11 +2,12 @@ package spec
 
 // Mapping holds the eVar/prop/event mapping for a specific property (e.g. fox_news).
 type Mapping struct {
-	Name       string
-	ProdRSID   string
-	DevRSID    string
-	DimMap     map[string]DimMapping   // canonical name -> eVar/prop mapping
-	EventMap   map[string]string       // canonical event -> adobe event (e.g. "page_view" -> "event1")
+	Name        string                  // derived from filename (e.g. "fox_news")
+	DisplayName string                  // from markdown heading (e.g. "Fox News & Fox Business Mapping")
+	ProdRSID    string
+	DevRSID     string
+	DimMap      map[string]DimMapping   // canonical name -> eVar/prop mapping
+	EventMap    map[string]string       // canonical event -> adobe event (e.g. "page_view" -> "event1")
 }
 
 // DimMapping maps a canonical dimension to its platform-specific field names.
